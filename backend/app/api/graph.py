@@ -9,7 +9,6 @@ import traceback
 import threading
 from contextlib import ExitStack, nullcontext
 from flask import request, jsonify
-from zep_cloud import NotFoundError
 
 from . import graph_bp
 from ..config import Config
@@ -89,6 +88,8 @@ def _delete_cloud_graph_if_present(graph_id: str | None) -> None:
                 f"{', '.join(active_simulations)}"
             )
         try:
+            from zep_cloud import NotFoundError
+
             GraphBuilderService(api_key=Config.ZEP_API_KEY).delete_graph(graph_id)
         except NotFoundError:
             logger.info("Zep Cloud graph already absent: %s", graph_id)

@@ -69,7 +69,19 @@
     "promptPlaceholder": "// 用自然语言输入模拟或预测需求（例.武大若发布撤销肖某处分的公告，会引发什么舆情走向）",
     "engineBadge": "引擎: MiroFish-V1.0",
     "startEngine": "启动引擎",
-    "initializing": "初始化中..."
+    "initializing": "初始化中...",
+    "genericUnavailable": "通用本地图谱尚未完成，此模式不可用，不会改用云端图谱。",
+    "tweetTitle": "推文预演",
+    "tweetHint": "打开页面和查看历史不需要模型通道。开始运行时才检查订阅 CLI 登录和 Ollama 配置。",
+    "tweetDraft": "推文草稿",
+    "tweetDraftPlaceholder": "粘贴要预演的草稿",
+    "tweetAuthor": "作者背景",
+    "tweetAuthorPlaceholder": "可选，最多 500 字",
+    "tweetAudience": "受众模板",
+    "tweetStart": "保存并检查运行",
+    "tweetHistory": "推文运行历史",
+    "tweetHistoryEmpty": "还没有推文运行。查看历史不需要 API key。",
+    "tweetHistoryError": "暂时读不到历史，页面仍然可以打开。"
   },
   "main": {
     "layoutGraph": "图谱",

@@ -5,8 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from zep_cloud.client import Zep
-
 from .logger import get_logger
 from .zep import call_zep_read_with_retry
 
@@ -119,7 +117,7 @@ def _fetch_all(
 
 
 def fetch_all_nodes(
-    client: Zep,
+    client: Any,
     graph_id: str,
     page_size: int = _DEFAULT_PAGE_SIZE,
     max_items: int | None = None,
@@ -140,7 +138,7 @@ def fetch_all_nodes(
 
 
 def fetch_all_edges(
-    client: Zep,
+    client: Any,
     graph_id: str,
     page_size: int = _DEFAULT_PAGE_SIZE,
     max_retries: int = _DEFAULT_MAX_RETRIES,

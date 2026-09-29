@@ -62,14 +62,21 @@ class Config:
     
     @classmethod
     def validate(cls) -> list[str]:
-        """验证必要配置"""
+        """验证被启用功能的配置。
+
+        默认推文模式和健康检查不要求 LLM 或 Zep 密钥。只有显式启用
+        云端通用模式时才检查这些密钥。
+        """
         errors: list[str] = []
-        if not cls.LLM_API_KEY:
-            errors.append("LLM_API_KEY 未配置")
-        if not cls.ZEP_API_KEY:
-            errors.append("ZEP_API_KEY 未配置")
-        if os.environ.get("ZEP_API_URL"):
-            errors.append("ZEP_API_URL 不受支持；MiroFish 仅连接 Zep Cloud")
+        mode = os.environ.get("MODE_DEFAULT", "tweet").strip().lower()
+        memory = os.environ.get("MEMORY_BACKEND", "local").strip().lower()
+        if mode != "tweet" and memory == "zep":
+            if not os.environ.get("LLM_API_KEY"):
+                errors.append("LLM_API_KEY 未配置")
+            if not os.environ.get("ZEP_API_KEY"):
+                errors.append("ZEP_API_KEY 未配置")
+            if os.environ.get("ZEP_API_URL"):
+                errors.append("ZEP_API_URL 不受支持；MiroFish 仅连接 Zep Cloud")
         if cls.DEBUG:
             import warnings
             warnings.warn("Flask DEBUG mode is enabled. Do not use in production.", RuntimeWarning)

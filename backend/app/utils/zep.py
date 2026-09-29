@@ -8,10 +8,29 @@ from functools import lru_cache
 from typing import Any, Callable, TypeVar
 
 import httpx
-from zep_cloud.client import Zep
-from zep_cloud.core.api_error import ApiError as ZepApiError
 
 from ..config import Config
+
+# Imported on first client or error-classification use so app startup does not
+# require the Zep SDK or a configured key. Tests may assign Zep before that.
+Zep = None
+ZepApiError = None
+
+
+def _load_sdk():
+    """Import the Zep SDK once, without replacing a test-injected client class."""
+
+    global Zep, ZepApiError
+    if Zep is not None and ZepApiError is not None:
+        return Zep, ZepApiError
+    from zep_cloud.client import Zep as ZepClient
+    from zep_cloud.core.api_error import ApiError as ApiError
+
+    if Zep is None:
+        Zep = ZepClient
+    if ZepApiError is None:
+        ZepApiError = ApiError
+    return Zep, ZepApiError
 from .logger import get_logger
 
 logger = get_logger("mirofish.zep")
@@ -80,6 +99,8 @@ def get_zep_client(api_key: str | None = None, timeout: float | None = None) -> 
     )
     if request_timeout <= 0:
         raise ValueError("Zep request timeout must be greater than 0")
+    if Zep is None:
+        _load_sdk()
     return _cached_zep_client(normalized_key, request_timeout)
 
 
@@ -92,11 +113,12 @@ def clear_zep_client_cache() -> None:
 def is_retryable_zep_error(error: BaseException) -> bool:
     """Return whether a failed *read* is safe and useful to retry."""
 
+    api_error = ZepApiError if ZepApiError is not None else _load_sdk()[1]
     if isinstance(error, (httpx.TimeoutException, httpx.TransportError)):
         return True
     if isinstance(error, (ConnectionError, TimeoutError, OSError)):
         return True
-    if isinstance(error, ZepApiError):
+    if isinstance(error, api_error):
         status_code = error.status_code
         return status_code in {408, 429} or (
             status_code is not None and 500 <= status_code <= 599
@@ -105,7 +127,8 @@ def is_retryable_zep_error(error: BaseException) -> bool:
 
 
 def _retry_after_seconds(error: BaseException) -> float | None:
-    if not isinstance(error, ZepApiError) or not error.headers:
+    api_error = ZepApiError if ZepApiError is not None else _load_sdk()[1]
+    if not isinstance(error, api_error) or not error.headers:
         return None
     value = next(
         (

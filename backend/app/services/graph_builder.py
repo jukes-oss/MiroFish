@@ -10,9 +10,28 @@ import threading
 from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass
 
-from zep_cloud import BatchAddItem, EntityEdgeSourceTarget, NotFoundError
-
 from ..config import Config
+
+BatchAddItem = None
+EntityEdgeSourceTarget = None
+NotFoundError = None
+
+
+def _ensure_zep_types():
+    """Load Zep model types only when a cloud graph operation actually runs."""
+
+    global BatchAddItem, EntityEdgeSourceTarget, NotFoundError
+    if BatchAddItem is not None and NotFoundError is not None and EntityEdgeSourceTarget is not None:
+        return
+    from zep_cloud import (
+        BatchAddItem as BatchAddItemCls,
+        EntityEdgeSourceTarget as EntityEdgeSourceTargetCls,
+        NotFoundError as NotFoundErrorCls,
+    )
+
+    BatchAddItem = BatchAddItemCls
+    EntityEdgeSourceTarget = EntityEdgeSourceTargetCls
+    NotFoundError = NotFoundErrorCls
 from ..models.task import TaskManager, TaskStatus
 from ..utils.zep_paging import fetch_all_nodes, fetch_all_edges
 from ..utils.ontology import (
@@ -224,6 +243,7 @@ class GraphBuilderService:
     ) -> str:
         """Create a graph with a caller-durable ID and reconcile lost replies."""
 
+        _ensure_zep_types()
         graph_id = graph_id or f"mirofish_{uuid.uuid4().hex[:16]}"
         # Persist the client-generated ID before the non-idempotent POST so a
         # later reset can clean up a graph whose successful response was lost.
@@ -312,6 +332,7 @@ class GraphBuilderService:
     
     def set_ontology(self, graph_id: str, ontology: Dict[str, Any]):
         """设置图谱本体（公开方法）"""
+        _ensure_zep_types()
         import warnings
         from typing import Optional
         from pydantic import Field
@@ -419,6 +440,7 @@ class GraphBuilderService:
         episodes. The returned batch identity allows callers to persist and
         reconcile the operation instead.
         """
+        _ensure_zep_types()
 
         if not graph_id:
             raise ValueError("graph_id is required")

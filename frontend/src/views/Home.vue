@@ -65,6 +65,9 @@
           <p class="section-desc">
             {{ $t('home.systemReadyDesc') }}
           </p>
+          <p class="generic-unavailable" role="status">
+            {{ genericReason || $t('home.genericUnavailable') }}
+          </p>
           
           <!-- 数据指标卡片 -->
           <div class="metrics-row">
@@ -126,6 +129,43 @@
         <!-- 右栏：交互控制台 -->
         <div class="right-panel">
           <div class="console-box">
+            <div class="console-section">
+              <div class="console-header">
+                <span class="console-label">{{ $t('home.tweetTitle') }}</span>
+              </div>
+              <p class="section-desc">{{ $t('home.tweetHint') }}</p>
+              <label class="tweet-label">{{ $t('home.tweetDraft') }}</label>
+              <textarea
+                v-model="tweetDraft"
+                class="code-input"
+                rows="4"
+                :placeholder="$t('home.tweetDraftPlaceholder')"
+              ></textarea>
+              <label class="tweet-label">{{ $t('home.tweetAuthor') }}</label>
+              <textarea
+                v-model="tweetAuthor"
+                class="code-input"
+                rows="2"
+                :placeholder="$t('home.tweetAuthorPlaceholder')"
+              ></textarea>
+              <label class="tweet-label">{{ $t('home.tweetAudience') }}</label>
+              <select v-model="tweetAudience" class="tweet-select">
+                <option value="zh_x_v1">zh_x_v1</option>
+              </select>
+              <button class="start-engine-btn" type="button" :disabled="tweetSubmitting" @click="startTweetRun">
+                {{ $t('home.tweetStart') }}
+              </button>
+              <p v-if="tweetError" class="tweet-error" role="alert">{{ tweetError }}</p>
+              <h3 class="tweet-history-title">{{ $t('home.tweetHistory') }}</h3>
+              <p v-if="tweetHistoryError" class="tweet-error">{{ tweetHistoryError }}</p>
+              <p v-else-if="tweetRuns.length === 0">{{ $t('home.tweetHistoryEmpty') }}</p>
+              <ul v-else class="tweet-history">
+                <li v-for="run in tweetRuns" :key="run.run_id">
+                  {{ run.status }} · {{ run.draft_preview }}
+                </li>
+              </ul>
+            </div>
+
             <!-- 上传区域 -->
             <div class="console-section">
               <div class="console-header">
@@ -193,13 +233,16 @@
             <div class="console-section btn-section">
               <button 
                 class="start-engine-btn"
+                type="button"
                 @click="startSimulation"
-                :disabled="!canSubmit || loading"
               >
                 <span v-if="!loading">{{ $t('home.startEngine') }}</span>
                 <span v-else>{{ $t('home.initializing') }}</span>
                 <span class="btn-arrow">→</span>
               </button>
+              <p v-if="genericBlocked" class="generic-unavailable" role="status">
+                {{ genericReason || $t('home.genericUnavailable') }}
+              </p>
             </div>
           </div>
         </div>
@@ -212,12 +255,20 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
+import service from '../api/index'
 
-const router = useRouter()
+const genericReason = ref('')
+const genericBlocked = ref(false)
+const tweetDraft = ref('')
+const tweetAuthor = ref('')
+const tweetAudience = ref('zh_x_v1')
+const tweetRuns = ref([])
+const tweetError = ref('')
+const tweetHistoryError = ref('')
+const tweetSubmitting = ref(false)
 
 // 表单数据
 const formData = ref({
@@ -234,11 +285,6 @@ const isDragOver = ref(false)
 
 // 文件输入引用
 const fileInput = ref(null)
-
-// 计算属性:是否可以提交
-const canSubmit = computed(() => {
-  return formData.value.simulationRequirement.trim() !== '' && files.value.length > 0
-})
 
 // 触发文件选择
 const triggerFileInput = () => {
@@ -294,20 +340,49 @@ const scrollToBottom = () => {
   })
 }
 
-// 开始模拟 - 立即跳转，API调用在Process页面进行
-const startSimulation = () => {
-  if (!canSubmit.value || loading.value) return
-  
-  // 存储待上传的数据
-  import('../store/pendingUpload.js').then(({ setPendingUpload }) => {
-    setPendingUpload(files.value, formData.value.simulationRequirement)
-    
-    // 立即跳转到Process页面（使用特殊标识表示新建项目）
-    router.push({
-      name: 'Process',
-      params: { projectId: 'new' }
+onMounted(async () => {
+  try {
+    const health = await service.get('/health')
+    genericReason.value = health.generic_mode?.reason || ''
+  } catch {
+    genericReason.value = ''
+  }
+  await loadTweetRuns()
+})
+
+const loadTweetRuns = async () => {
+  try {
+    const data = await service.get('/api/tweet/runs')
+    tweetRuns.value = data.runs || []
+    tweetHistoryError.value = ''
+  } catch {
+    tweetHistoryError.value = '暂时读不到历史，页面仍然可以打开。'
+    tweetRuns.value = []
+  }
+}
+
+const startTweetRun = async () => {
+  tweetError.value = ''
+  tweetSubmitting.value = true
+  try {
+    await service.post('/api/tweet/runs', {
+      idempotency_key: `ui-${Date.now()}`,
+      draft_text: tweetDraft.value,
+      author_context: tweetAuthor.value,
+      audience_version: tweetAudience.value,
     })
-  })
+    tweetDraft.value = ''
+    await loadTweetRuns()
+  } catch (error) {
+    tweetError.value = error.message || '无法开始运行'
+  } finally {
+    tweetSubmitting.value = false
+  }
+}
+
+// 通用模式的本地图谱尚未完成。按钮只提示不可用，不进入云端建图。
+const startSimulation = () => {
+  genericBlocked.value = true
 }
 </script>
 
@@ -327,6 +402,28 @@ const startSimulation = () => {
   --font-mono: 'JetBrains Mono', monospace;
   --font-sans: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
   --font-cn: 'Noto Sans SC', system-ui, sans-serif;
+}
+
+.generic-unavailable,
+.tweet-error {
+  color: #9a3412;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  padding: 10px 12px;
+  margin: 12px 0;
+}
+
+.tweet-label,
+.tweet-history-title {
+  display: block;
+  margin: 12px 0 6px;
+  font-size: 14px;
+}
+
+.tweet-select,
+.tweet-history {
+  width: 100%;
+  margin-bottom: 12px;
 }
 
 .home-container {

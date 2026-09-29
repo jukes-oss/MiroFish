@@ -24,6 +24,8 @@ from app.config import Config
 
 def main():
     """主函数"""
+    # 推文模式在进程内跑唯一的本地 worker。测试默认不启动它。
+    os.environ.setdefault("TWEET_WORKER_MODE", "thread")
     # 验证配置
     errors = Config.validate()
     if errors:
