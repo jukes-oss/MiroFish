@@ -1,490 +1,242 @@
-# MiroFish 中文版改造计划（推文预演优先）
+# MiroFish 中文优先版开发计划（严格审查定稿）
 
-本文只做摸底和方案，不改应用代码。后续实现以本仓库 `jukes-oss/MiroFish` 的 `main` 为基线，不要把改动提交回上游 `666ghj/MiroFish`。
+版本：2026-09-29。目标仓库：`jukes-oss/MiroFish`。本文与 `prompts/` 一起替换初稿；这是实施计划与契约，没有修改或运行应用代码。所有新路径、接口和配置明确属于计划。原草稿保留不动。
 
-许可证是 AGPL-3.0（见根目录 `LICENSE`）。如果以后把改过的程序提供给别人用，需要按 AGPL 保留协议和对应源码。这不是法律意见，只是提醒后续分发时不要把它当成私有闭源服务。
+## 1. 产品目标与核实边界
 
-总目标：把这个 fork 收成中文优先的个人版本，第一个能用的场景是「推文预演」。用户贴上一则 X/Twitter 草稿（中文或英文），系统生成一小组立场不同的模拟用户，让他们划走、点赞、转发、引用或回复，然后给出一份固定格式的发布前备忘：热度档、哪几句会惹人、可能被顶上来的回复、反噬风险、两三条改写。后面还想做游戏购买反应、播客选题、故事续写，所以这次要把「模式」留成可插拔的，不要把推文逻辑写死在唯一入口里。
+首个场景是「推文预演」：粘贴 X 草稿，选择中文 X 受众，运行多样化虚构账号的短程模拟，返回模拟互动档、原文触发句及群体、可能获得点赞的回复候选、反噬风险、2–3 个改写与不确定性。界面简体中文，模拟原话允许繁体、中英夹杂。互动档初版只对本次样本有意义，不能等同真实传播量；没有有效回复时可以明确显示“本次无回复”。
 
-难度记号：S 是局部改动，M 是要动一条链路，L 是跨前后端、还要替换外部服务或改模拟循环。
+首版面向单用户本机使用，不直接发到 X，不需要 X 登录，不自动抓链接。保留通用五步模拟的次入口；推文预演使用轻量独立动作循环，通用模式保留 OASIS。两者复用角色模型层、费用账本、任务生命周期和本地存储，不硬套同一个模拟引擎。完整改造完成必须包含通用模式的本地图替换，不能把推文绕过 Zep 当作已经替换 Zep。
 
----
+### 1.1 本次查证方式
 
-## 1. 现状摸底
+逐文件通过 `curl` 获取上游 `main`、CAMEL/OASIS 对应版本的 raw 源码，无 clone。GitHub tree API 只调用一次，返回 HTTP 403。审查工作区里的 upstream_tree.json 记录了这次失败，不是假目录树；upstream_manifest.json 与 external_manifest.json 保存了 URL、成功/失败和 SHA-256。这三份文件都没有放进本仓库。获取的是可变分支快照，**没有取得上游固定 commit SHA**，后续 M0 必须在用户已有工作区固定基线。
 
-### 1.1 它是怎么拼起来的
+抽查 fork 的 `config.py`、`pyproject.toml`、`run_parallel_simulation.py` 与此次上游文件逐字一致；当时 PR 分支上的计划与审查工作区中的初稿逐字一致。该初稿副本没有单独放进本仓库。其余 fork 文件、PR 当前 merge 状态与整仓差异**未核实**，不能推断整个 fork 与上游完全相同。
 
-这是一个单体应用，没有独立数据库服务。
+### 1.2 已核实的现状与纠错
 
-- 前端：Vue 3 + Vue Router + vue-i18n + Vite，入口在 `frontend/src/main.js`，路由在 `frontend/src/router/index.js`。开发时 Vite 把 `/api` 代理到 `http://localhost:5001`（`frontend/vite.config.js`）。
-- 后端：Flask 应用工厂 `backend/app/__init__.py`。启动脚本是 `backend/run.py`，默认监听 `0.0.0.0:5001`。
-- 三个 API 蓝图：
-  - `/api/graph`：上传种子、生成本体、建图谱（`backend/app/api/graph.py`）
-  - `/api/simulation`：建模拟、生成人设、开跑、采访（`backend/app/api/simulation.py`）
-  - `/api/report`：写报告、和报告助手聊天（`backend/app/api/report.py`）
-- 状态几乎都是本地文件，放在 `backend/uploads/`：
-  - 项目：`uploads/projects/`（`backend/app/models/project.py` 的 `ProjectManager`）
-  - 模拟：`uploads/simulations/`（`backend/app/services/simulation_manager.py`）
-  - 报告：`uploads/reports/`（`backend/app/services/report_agent.py` 里的 `ReportManager`）
-  - OASIS 自己还有两个 SQLite：`twitter_simulation.db`、`reddit_simulation.db`
-- 任务进度（本体、建图、准备模拟）存在内存里的 `TaskManager`（`backend/app/models/task.py`）。进程一重启，进行中的任务状态就没了，虽然项目 JSON 还在。
-- 社交模拟不在 Flask 进程里跑。`backend/app/services/simulation_runner.py` 用子进程启动 `backend/scripts/run_parallel_simulation.py`。这个脚本同时跑 Twitter 和 Reddit 两套 OASIS 环境。
-- 界面是五步向导：首页上传 → 图谱构建 → 环境搭建 → 开始模拟 → 报告 → 深度互动。对应 `frontend/src/views/Home.vue`、`MainView.vue`，以及 `Step1` 到 `Step5` 组件。模拟跑起来之后会跳到 `/simulation/:id`、`/report/:id`、`/interaction/:id`。
-
-依赖里真正重的是 `camel-oasis==0.2.5` 和 `camel-ai==0.2.78`（`backend/pyproject.toml`）。它们会带上 PyTorch 和 sentence-transformers。图谱记忆则是付费 SaaS：`zep-cloud==3.25.0`。
-
-### 1.2 一次完整模拟怎么走
-
-下面是现在的主路径。推文预演以后不应该被迫走完全程，但通用模式还要留着。
-
-1. **种子**。首页用自然语言写「模拟需求」，并上传 PDF / MD / TXT。`POST /api/graph/ontology/generate` 把文件存进项目目录，抽出纯文本。允许的扩展名在 `backend/app/config.py` 的 `ALLOWED_EXTENSIONS`。
-2. **本体**。`OntologyGenerator`（`backend/app/services/ontology_generator.py`）让大模型设计正好 10 种实体、6 到 10 种关系。类型名强制英文 PascalCase，因为后面要交给 Zep。
-3. **建图**。`POST /api/graph/build` 调用 `GraphBuilderService`（`backend/app/services/graph_builder.py`）。文本按约 500 字切块（`backend/app/services/text_processor.py`），成批送给 Zep Cloud。Zep 在云端做实体和关系抽取。本地只保存 `graph_id`，图本身不在本地。
-4. **建模拟壳**。`POST /api/simulation/create` 记下 `project_id`、`graph_id`，以及是否开启 Twitter / Reddit。默认两个都开。
-5. **准备环境**。`POST /api/simulation/prepare` 做三件费钱的事：
-   - `ZepEntityReader` 把云端节点读回来（`backend/app/services/zep_entity_reader.py`）
-   - `OasisProfileGenerator` 给每个实体写一份人设（`backend/app/services/oasis_profile_generator.py`）。个人和机构用不同提示词，人设要求约 2000 字
-   - `SimulationConfigGenerator` 再让模型生成时间表、初始帖、每个 agent 的活跃度和立场（`backend/app/services/simulation_config_generator.py`）
-6. **开跑**。子进程里 `generate_twitter_agent_graph` / `generate_reddit_agent_graph` 读人设文件。每一轮先按作息挑出「醒着」的 agent（`get_active_agents_for_round`），再对他们执行 `LLMAction()`，也就是每人至少一次大模型调用。初始帖用 `ManualAction` 直接写入，不经过模型。
-7. **边跑边写回 Zep**。`ZepGraphMemoryUpdater`（`backend/app/services/zep_graph_memory_updater.py`）盯着动作日志，把行为拼成自然语言，再 `graph.add` 回 Zep。报告阶段才能「搜到模拟中发生的事」。
-8. **报告**。`ReportAgent`（`backend/app/services/report_agent.py`）先规划 2 到 5 个章节，再按 ReACT 循环调用 Zep 工具：`insight_forge`、`panorama_search`、`quick_search`、`interview_agents`（实现在 `backend/app/services/zep_tools.py`）。采访会通过 IPC 打进还没关闭的 OASIS 进程（`backend/app/services/simulation_ipc.py`）。
-9. **互动**。模拟环境可以留着，前端继续单人采访；报告助手也可以再搜一次图。
-
-Twitter 侧启用的动作在 `backend/app/config.py` 的 `OASIS_TWITTER_ACTIONS`：发帖、点赞、转发、关注、什么都不做、引用。没有「回复」。Reddit 才有评论。OASIS 0.2.5 的 `ActionType` 里虽然有 `CREATE_COMMENT`，但本仓库的 Twitter 列表没启用它。推文预演如果要「回复」，要么改用引用，要么先做一次小实验确认 Twitter 平台的 SQLite 能写评论。这是后面 M5 的风险，不是现在就能当成已支持的功能。
-
-### 1.3 大模型是在哪里被调用的
-
-已经有一个 OpenAI 兼容客户端 `backend/app/utils/llm_client.py`。密钥和地址来自环境变量，不是写死的某一家。兼容层在 `backend/app/utils/openai_chat_compat.py`（处理 `response_format` 不被支持、以及思考模型把内容放在别的字段里的情况）。
-
-但是「一个客户端」不等于「按角色选模型」：
-
-| 调用点 | 用的客户端 | 现在的模型从哪来 |
+| 项目 | 已核实结果与实施影响 | 直接证据 |
 | --- | --- | --- |
-| 本体、报告、Zep 工具里的子问题/采访策划 | `LLMClient` | 全局 `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL_NAME` |
-| 人设、模拟配置 | 各自又 `new` 了一个 `OpenAI()` | 同一组全局变量 |
-| OASIS 里每个 agent 的行动 | camel 的 `ModelFactory`（`backend/scripts/run_parallel_simulation.py` 的 `create_model`） | Twitter 用全局模型；Reddit 如果设了 `LLM_BOOST_*` 就用加速那一套 |
+| 前后端与 API | Vue 3、Vue Router、vue-i18n、Vite；Flask 应用工厂注册 graph/simulation/report 三个蓝图，健康端点 `/health`。是前后端加模拟子进程的部署，仍依赖云图谱，不能简称“没有数据库” | [前端依赖](https://raw.githubusercontent.com/666ghj/MiroFish/main/frontend/package.json)、[应用工厂](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/__init__.py) |
+| 中文现状 | 默认和 fallback 已为 `zh`，语言包在根 `locales/`。主要工作是补硬编码和改产品入口，不是重做 i18n | [i18n](https://raw.githubusercontent.com/666ghj/MiroFish/main/frontend/src/i18n/index.js)、[中文包](https://raw.githubusercontent.com/666ghj/MiroFish/main/locales/zh.json) |
+| 前端连后端 | Vite 有 `/api` 代理，但 Axios 默认 `http://localhost:5001`，实际默认直连；只写“开发代理可不配”会掩盖远程访问问题 | [Vite](https://raw.githubusercontent.com/666ghj/MiroFish/main/frontend/vite.config.js)、[Axios](https://raw.githubusercontent.com/666ghj/MiroFish/main/frontend/src/api/index.js) |
+| 启动硬依赖 | `run.py` 调 `Config.validate()`，缺 LLM/Zep 密钥会退出；工厂函数本身不执行此验证。前端静态页能启动不等于后端全链路可用 | [启动](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/run.py)、[配置](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/config.py) |
+| 存储与任务 | 项目、模拟、报告保存于 uploads；OASIS 使用 SQLite；TaskManager 是进程内字典。重启恢复、持久预算需另做 | [项目](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/models/project.py)、[任务](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/models/task.py)、[模拟管理](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/services/simulation_manager.py) |
+| 执行脚本 | runner 按平台选择 `run_twitter_simulation.py`、`run_reddit_simulation.py` 或 `run_parallel_simulation.py`；不是总启动双平台脚本。默认配置双平台可启用 | [runner](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/services/simulation_runner.py)、[模拟 API](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/api/simulation.py) |
+| OASIS 行动 | 三个脚本各有动作表，不能只改 Config；Twitter 启用列表无评论，Reddit 有。已核实依赖有 create_comment 方法，不等于本项目 Twitter 回复、展示、点赞链路已跑通 | [双平台脚本](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/scripts/run_parallel_simulation.py)、[OASIS 平台](https://raw.githubusercontent.com/camel-ai/oasis/v0.2.5/oasis/social_platform/platform.py) |
+| 图谱与本体 | 本体提示要求 10 种实体、6–10 种关系；默认分块 500 字符；Zep 云端抽取，本地项目记录 graph_id，没有本地权威图数据库 | [本体](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/services/ontology_generator.py)、[建图](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/services/graph_builder.py)、[分块](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/services/text_processor.py) |
+| Zep 范围 | 云图建/读/搜、实体扩展、人设上下文、行为写回、删除均依赖 Zep；固定云 URL，设置 ZEP_API_URL 被拒绝。本地替代要覆盖消费者而不只换客户端 | [Zep 工具](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/services/zep_tools.py)、[客户端](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/utils/zep.py)、[写回](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/services/zep_graph_memory_updater.py)、[删除](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/api/graph.py) |
+| LLM 调用点 | 本体/报告/工具主要用 LLMClient；人设、模拟配置直接建 OpenAI 客户端；三个 runner 经 CAMEL 发行动请求，boost 仅按平台拆分，不是角色路由 | [人设](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/services/oasis_profile_generator.py)、[模拟配置](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/services/simulation_config_generator.py)、[LLMClient](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/utils/llm_client.py) |
+| 密钥注入 | 脚本确实写进程级 OPENAI 环境变量；但 CAMEL 0.2.78 的 ModelFactory 已支持 `api_key`/`url`，OpenAIModel 初始化保存到实例。没有证据证明现有实例运行时一定串钥匙；应改显式注入并测试，不能再把是否支持列为未知 | [ModelFactory](https://raw.githubusercontent.com/camel-ai/camel/v0.2.78/camel/models/model_factory.py)、[OpenAIModel](https://raw.githubusercontent.com/camel-ai/camel/v0.2.78/camel/models/openai_model.py) |
+| 费用隐患 | `chat_json` 内容重试会取消输出上限；兼容助手只按 `gpt-5` 前缀选择 token 参数，不能推定任意 GPT/Grok 都可直接换模型名 | [LLMClient](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/utils/llm_client.py)、[兼容层](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/utils/openai_chat_compat.py) |
+| 报告 | ReACT 报告按章节取证；每章工具调用常量 5，MAX_REFLECTION_ROUNDS 常量 3 未见独立反思循环；Config 的 REPORT_AGENT 参数未被该类使用，不能当有效费用开关 | [报告](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/services/report_agent.py)、[IPC](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/app/services/simulation_ipc.py) |
+| 行动提示词 | OASIS 系统模板英文、每轮提示鼓励不要只点赞；SocialAgent 支持自定义 user_info_template，生成 Twitter agent 的 helper 没暴露该参数。换 system 不会自动改每轮提示 | [agent](https://raw.githubusercontent.com/camel-ai/oasis/v0.2.5/oasis/social_agent/agent.py)、[生成器](https://raw.githubusercontent.com/camel-ai/oasis/v0.2.5/oasis/social_agent/agents_generator.py)、[UserInfo](https://raw.githubusercontent.com/camel-ai/oasis/v0.2.5/oasis/social_platform/config/user.py) |
+| 依赖与部署 | Python >=3.11,<3.13；根 Node engine >=18；camel-oasis 0.2.5、camel-ai 0.2.78、zep-cloud 3.25.0；锁文件含 sentence-transformers/torch。compose 拉上游镜像且仅挂 uploads；Dockerfile 执行 npm run dev | [pyproject](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/pyproject.toml)、[锁文件](https://raw.githubusercontent.com/666ghj/MiroFish/main/backend/uv.lock)、[根配置](https://raw.githubusercontent.com/666ghj/MiroFish/main/package.json)、[compose](https://raw.githubusercontent.com/666ghj/MiroFish/main/docker-compose.yml)、[Dockerfile](https://raw.githubusercontent.com/666ghj/MiroFish/main/Dockerfile) |
 
-`create_model` 会把密钥写进进程级环境变量 `OPENAI_API_KEY` 和 `OPENAI_API_BASE_URL`。双平台在同一个进程里跑，这样换角色密钥有互相覆盖的风险。M2 应该把密钥交到模型对象上，不要靠改全局环境变量。
+补充核实：默认 max rounds 配置是 10，脚本可按 72 小时/步长算轮数再由传入上限截断；是否每个入口都传上限须 M0 检查实际基线。脚本 `semaphore=30` 是环境级并发值，双平台不能把它当作整个进程的总请求上限。一次 `LLMAction` 也不是可计费请求数契约，费用必须在真实出站层统计。
 
-现有的「加速模型」只是为了让 Reddit 和 Twitter 打到不同供应商，提高并发，不是「贵模型写报告、便宜模型跑群演」。
+### 1.3 不沿用为本次事实的内容
 
-费用开关今天很弱：
+草稿声称安装成功、130 项 pytest 通过、前端 build 成功、2 个 npm 漏洞以及具体机器版本：这是原作者自述，缺少可复现日志，本次**未核实、未重跑**，不能写成当前验收完成。本次环境 Python 为 3.13.5，不满足上游范围，因此没有尝试装完整应用。Docker、Zep 建图、OASIS 真实运行、付费模型兼容性/价格/延迟/质量、历史推文准确性全部**未实测**。README 的免费额度和“平均 5 美元/次”仅是项目文案，不能拿来定价或做性能承诺。
 
-- `OASIS_DEFAULT_MAX_ROUNDS` 默认 10（`backend/app/config.py`）。时间配置却常常生成 72 小时、每轮 60 分钟，也就是 72 轮，再被 max_rounds 截断。
-- 每轮醒着的人数由模型生成的 `agents_per_hour_min/max` 决定，上限大约是实体数的九成。实体数等于图谱里抽出来的人数，没有单独的「最多 30 个 agent」开关。
-- 人设提示词要求约 2000 字，而且 Twitter 侧会把 `bio + persona` 整段塞进 `user_char`。OASIS 每轮都把这段放进系统提示词。这是单次模拟变贵的主要原因。
-- OASIS 环境的并发信号量是 30（`run_parallel_simulation.py` 里 `oasis.make(..., semaphore=30)`）。
-- `config.py` 里的 `REPORT_AGENT_MAX_TOOL_CALLS`、`REPORT_AGENT_MAX_REFLECTION_ROUNDS`、`REPORT_AGENT_TEMPERATURE` 没有被 `ReportAgent` 读到。类里写死了每章最多 5 次工具调用。`MAX_REFLECTION_ROUNDS` 只有常量，没有反思循环。
+## 2. 实施架构与边界
 
-语言：`backend/app/utils/locale.py` 的 `get_language_instruction()` 会把「请使用中文回答」贴到很多提示词后面。前端用 `Accept-Language` 传当前界面语言（`frontend/src/api/index.js`）。默认语言已经是中文。
+### 2.1 先解耦启动和持久任务
 
-### 1.4 Zep 用在哪
+新增 `MODE_DEFAULT=tweet`、`MEMORY_BACKEND=local|zep`（默认 local）；配置按被启用功能验证。无 Zep 密钥可启动推文及健康检查；无 LLM 密钥也能打开界面和查看历史，发起付费运行返回明确配置错误。Zep SDK 延迟导入、客户端延迟初始化，避免改了 validate 仍在 import 时失败。通用本地图尚未完成时，界面明确显示该模式不可用，不能暗中退回云端。
 
-Zep 不是可选缓存，而是图的唯一存储。客户端在 `backend/app/utils/zep.py`，基址写死为 `https://api.getzep.com/api/v2`。如果环境里出现 `ZEP_API_URL`，配置校验和客户端都会直接报错，明确不支持自建地址。
+新建 `uploads/state.sqlite` 存 `runs, exposures, actions, provider_requests, budget_ledger, artifacts`，WAL、外键、事务、单工作队列。任务状态为 `queued → preparing → running → reporting → complete|degraded|failed|cancelled`。取消后不发新请求；已发请求仍结算。启动时回收失效 worker 租约，未知请求保留预留并记待核账；不自动重放可能收费的请求。初版一台机器、一个执行 worker，最多一个运行任务；API 可并发读取。
 
-主要用途：
+拟新增接口：`POST /api/tweet/runs`（幂等键，返回 202 与 run_id）、`GET /api/tweet/runs/<id>`、`POST /api/tweet/runs/<id>/cancel`、`GET /api/tweet/runs/<id>/report`、`DELETE /api/tweet/runs/<id>`。校验草稿 1–2000 个 Unicode 码点、作者背景 ≤500、受众从允许模板选择，人数/波次由服务端夹限。此长度是产品限制，不宣称等同 X 当前发布限制。重试同幂等键返回同一任务；不同输入复用同键返回 409。
 
-- 按本体建图、等待云端抽完实体（`graph_builder.py`）
-- 读节点和边，供人设与前端画图（`zep_entity_reader.py`、`zep_paging.py`）
-- 模拟进行中把行为写回图（`zep_graph_memory_updater.py`）
-- 报告工具做语义搜索、全量边、采访人选（`zep_tools.py`）
-- 删除项目时删云端图（`backend/app/api/graph.py` 的 `_delete_cloud_graph_if_present`）
+### 2.2 角色模型层与供应商能力
 
-本地已经有的 SQLite 只属于 OASIS 的帖子表，不能代替 Zep 的实体图。
+新增 `providers/`：不可变的 `ProviderConfig`、`RoleConfig`、`CapabilityProfile`；按角色获取客户端，所有实际请求走预算网关。角色覆盖 `persona, agent, report, ontology, extractor, config, interview`；`moderator` 初版为规则，不配模型。旧全局环境配置仅作迁移兜底，并在运行前冻结解析结果；跨供应商不得混用默认密钥和另一个 base URL。
 
-### 1.5 外部依赖和费用
+| 角色 | 推荐运行时选择 | 默认每物理请求输入 / 输出 token 上限 |
+| --- | --- | --- |
+| persona | OpenAI GPT 家族中通过中文短人设/schema 测试的模型；批量 20 个 | 6000 / 6000 |
+| agent | xAI Grok 家族中通过动作测试且实测单次成本最低的可用模型 | 2400 / 600 |
+| report | OpenAI GPT 家族中通过证据与改写 eval 的模型 | 10000 / 6000 |
+| ontology / extractor / config / interview | 可先复用 persona 的模型；独立预算配置 | 按功能有界，默认不得无限输出 |
 
-| 依赖 | 是否必须 | 费用 | 说明 |
+这里的运行时 API `model_id` 必须来自账户可用列表与官方能力核验，缺失则禁止开始运行。**里程碑指定的 Cursor/Codex 执行模型不自动等于可付费调用的 API 型号，也不代表其单价。**默认供应商分工是建议，可全部使用同一已验证供应商；不能因为名叫 Grok 就假定更便宜或更懂中文 X。
+
+配置建议采用 `providers.json`（无密钥）引用环境变量 `XAI_API_KEY`、`OPENAI_API_KEY`；角色指向明确 provider/model/capability/price 版本。保留 `.env.example` 说明旧 `LLM_*`/`LLM_BOOST_*` 的迁移规则；不把密钥写入报告、URL、模拟 JSON 或前端。供应商地址只由本机管理员配置，不接受草稿里的地址。
+
+M2 用 mock 和小额独立冒烟核实：Chat Completions、JSON/schema 支持、token 上限参数、是否接受 temperature、reasoning token 计费、usage 字段、429/超时/拒绝行为；用能力表而非模型名前缀猜测。结构化输出仍须本地校验。[OpenAI](https://developers.openai.com/api/docs/guides/structured-outputs) 与 [xAI](https://docs.x.ai/developers/model-capabilities/text/structured-outputs) 均有相关接口说明，但账户权限和实际型号兼容性尚未实测。
+
+通用 OASIS 路径改三份脚本及 CAMEL 适配器：显式传 key/url，拦截每个物理请求、禁用隐藏重试，覆盖内部工具轮次。若无法做到同一预算网关，通用付费模式保持不可用；不能宣传全局费用保护却给 OASIS 留旁路。Zep 云服务另有外部费用，选择 zep 时不得把 LLM 上限当作总账单保证。
+
+### 2.3 推文循环与证据模型
+
+采用 `prompts/` 中的固定契约。默认 120 人、3 波（40/40/40），最大 240 人、4 波；每人一次原帖曝光。大多数曝光由规则生成 none，不调用模型，默认预期约 12 次行动请求。人设分 6 批生成、固定人群可缓存。冷启动的人设费用必须包含在预估中。
+
+核心动作 `none|like|reply|repost|quote`。独立本地循环直接支持回复及其父帖，不接受“引用转发暂代回复”的产品降级。无新帖、关注、真实发帖或无限对话；不承诺实现整个社交平台。该循环仍需事务、可见性、失败恢复、去重、预算和指标测试，不能按“一两百行”估工期。
+
+候选动作先验与完整配额见 [audience.zh.md](prompts/audience.zh.md)，曝光/调度与档位见 [tweet_round_moderator.zh.md](prompts/tweet_round_moderator.zh.md)。先验可让模型放弃，不能让它临时改动作类型；保留内容对接受率与措辞的影响，但传播上限受到设计约束，必须在评估中披露。轮次是采样波次，不虚构为真实小时。
+
+引用用原稿码点跨度和 action_id。报告不仅验证 ID 存在，还验证“该账号看过什么、做过什么、文本是否支持断言”。群体标签、分母、去重、计数、费用、档位由程序计算；不让报告模型自由统计。失败记 missing，未曝光不计沉默，沉默不计支持。
+
+### 2.4 本地记忆替换 Zep（完整改造必做）
+
+建立 `MemoryStore` 接口：`ingest, get_nodes, get_edges, search, append_events, delete_graph, export_graph`。接口 DTO 与 Zep SDK 类型解耦；节点/边/episode 带稳定 ID、来源跨度、created_at、valid_at/invalid_at（未知用 null）、schema_version。通用 API 适配器保持 GraphPanel 所需字段，不把“JSON 形状兼容”当作搜索质量等价。
+
+SQLite 表：`graphs, documents, chunks, nodes, edges, episodes, extraction_jobs`，独立于 OASIS 平台数据库。抽取由 extractor 角色执行，验证类型/引用/实体关系端点；失败块保留原文、错误和状态，可在预算内修复一次；修复失败标 partial 并可重跑，**不能静默丢弃**。实体去重先规范化名称与类型，冲突保留多候选；不由模型随意合并同名人。写入幂等，事件 append-only；更新有效时间不覆盖原始来源。
+
+中文搜索不能只宣称“FTS5 必须有”：默认 unicode61 不进行中文分词。采用版本化中文分词后的独立检索列 + FTS5，保留原文和偏移；简繁归一化只用于索引。trigram 可作子串辅助，但 1–2 字查询需显式 fallback 或分词索引，不可漏掉。用中文、繁体、中英混合、两字实体名测试召回。[SQLite FTS5 官方说明](https://www.sqlite.org/fts5.html)。初版暂不下载 embedding 模型；未来若加向量搜索需固定模型、许可证、下载位置、内存与离线失败策略，不能因依赖中有 sentence-transformers 就当免费成熟能力。
+
+改动覆盖 graph_builder、实体 reader、人设上下文检索、memory updater、report tools、删除和启动路径。把 `zep_tools` 抽象成与后端无关的证据查询工具；历史报告不得将缺失字段补成云端等效事实。现有云项目保持原 `backend=zep`，切默认不自动迁移、不删除云数据；提供可选只读导出导入与计数/哈希核对，失败可回滚。只有显式删除对应项目才删除其云图。
+
+M6 完成后，新项目默认全本地，无 ZEP_API_KEY 可走通本体→抽取→人设→OASIS→行为记忆→报告。保留 zep 适配器仅为兼容；可以后续把 zep-cloud 改 optional extra，不能在未消除导入依赖前直接删包。
+
+### 2.5 中文界面、输入边界与部署
+
+保留 vue-i18n，清理 MainView 的英文状态、四个 View 的 Error/Step、Step3 的平台统计文字、人设英文兜底。所有机器枚举保持英文。推文入口优先，通用模式次入口；默认报告与解释简体中文，模拟原话不强制翻译。显示受众假设、样本规模、缺失数据、互动档含义、回复证据、费用预估/实际与停止原因。
+
+默认同源 `/api` 与显式反向代理；开发 Vite 代理，部署时静态前端与后端走同域，保留环境覆盖。不再让远程浏览器连它自己的 localhost。前端把模型文本当纯文本渲染，不用未清洗的 v-html；不执行生成链接/脚本。请求日志移除草稿正文和 Authorization，关闭 debug 请求体日志。单机默认绑定 127.0.0.1、限制 CORS；需要远程访问再加认证、任务归属、配额与数据隔离。
+
+草稿、人设、日志、导出与缓存默认保存 7 天，可一键删除及导出；删除同步清理索引/缓存，备份按单独保留策略标明。提示用户草稿会发送到选定 LLM 供应商；“本地记忆”不等于“数据不出机器”。品牌暂保留 MiroFish，副标题“中文推文预演”，主 GitHub 链接改 fork 并保留上游致谢。
+
+## 3. 成本与硬性费用控制
+
+### 3.1 配置和估算公式
+
+建议默认：`RUN_MAX_USD=1.00`、用户界面最高可选 `5.00`、日总额 `5.00`（本机管理员可改）；`RUN_MAX_TOTAL_TOKENS=150000`、`RUN_MAX_REQUESTS=80`、`AGENT_MAX_REQUESTS=60`（含全部重试）、`LLM_CONCURRENCY=4`。人数 120 / 上限 240，波次 3 / 上限 4。大规模配置可能被预算拒绝，不能保证“240 人一定能在 1 美元内完成”。美元是内部账本单位，人民币展示若无更新汇率仅显示用户设置的参考汇率。
+
+对角色 r：`C_r = ((I_r - H_r) * P_in_r + H_r * P_cached_r + O_r * P_out_r) / 1e6 + F_r`；`I` 输入 token，`H` 是供应商确认已计入 I 的缓存 token，`O` 是全部计费输出（包含推理，避免重复加 reasoning_tokens），`F` 是其他已知费用。总费用为所有物理请求之和；没有确认缓存计费就按未缓存算。不同供应商 usage 语义由适配器统一，不能机械相加 total_tokens、completion_tokens、reasoning_tokens。
+
+预估调用数：`ceil(N/20)` 人设批次 + `sum_i P_i(non_none)` 行动 + 1 报告；重试作为单独上界项。token 预估：`T ≈ Σ_calls (input_tokens + output_tokens)`。冷缓存与热缓存分列；本地人设缓存命中才可减人设调用，供应商缓存折扣未确认不能预扣。
+
+**纯算术示例，不是当前模型报价或实测**：假设 persona/report 单价为输入 $2、输出 $8 / 1M，agent 为 $0.5/$2；人设 6×(3000 in+4500 out)，行动 12×(1800 in+300 out)，报告 1×(7000 in+4000 out)，则冷缓存 81,200 tokens、$0.3160，热人设缓存 36,200 tokens、$0.0640，均不含重试。实际须用当日有效 price 表重新计算；最坏输出和重试可能明显更高。
+
+### 3.2 发请求前的费用闸门
+
+账本用整数微美元或 Decimal，不能用 float 累计。每次请求在 SQLite 同一事务中预留费用与 token：
+
+```text
+spent + uncertain + reserved + new_upper_bound <= run_cap
+并且同样满足 day_cap、token_cap、request_cap
+```
+
+`new_upper_bound` 根据该模型已验证的输入计数上界、全部计费输出硬上限和冻结单价计算；无可靠 tokenizer 时使用经验证的保守计数上界，无法建立上界则拒绝该模型。未知价格/过期报价/不支持输出硬限/存在未计价工具费用时 fail closed。禁用供应商搜索等额外工具。价格表带日期和来源，超过 7 天默认要求管理员刷新，不能擅自拿旧价格称“硬上限”。
+
+预先圈定报告及一次修复的保守费用；运行请求不能花掉这部分。人设/行动若余额不足即停止后续请求，用剩余报告额度生成带缺失说明的报告；连报告额度都不足则程序生成 degraded JSON。使用 reserved 池子避免把报告预留再计算两遍。已发送超时、断连、取消以及进程崩溃的请求保留最大预留至核账，不当免费、不盲目重放。
+
+账本状态互斥：预留后为 reserved，收到确定 usage 后转 charged，收费未知时将同一笔预留转 uncertain，不在两栏重复记账；后续核账只做状态转移与差额调整。每次网络尝试独立账单项；SDK/CAMEL 内部重试设为 0，由网关控制总次数 ≤2。重试维持输出上限。usage 返回后按实际结算，未返回按预留上界记 uncertain。并发请求先拿预留再出网，持久化后才提交；重启不清空账本。程序保证的是按冻结价格与已验证 token 上界的授权支出；供应商账单差错或运行外其他调用不在本地闸门控制范围，另在供应商账户设置额度。
+
+缓存键至少包含 provider/model/capability、prompt/schema hash、受众/槽位版本、语言、seed 与输入 hash。人设批量生成可共用一个请求；行动只做 HTTP 并发或供应商的独立条目批处理，不合并私有人设。在线预演不依赖有长等待窗口的 Batch API；离线 eval 才考虑，经费用预留后提交。
+
+## 4. 提示词、报告与评估
+
+### 4.1 人群与沉默
+
+完整分层配额及跨维度规则在 [audience.zh.md](prompts/audience.zh.md)。12 个主圈层覆盖技术、币圈、海外/大陆/港台、键政、女权/反女权、段子、营销、路人及机器人；关系、活跃度、语言、影响力、先验态度独立分配。配额是可配置假设，不宣称真实人口统计。人设生成不看草稿，避免为当前内容定制一群必然有反应的人。
+
+默认候选分布 none 90%、like 7%、reply 1.5%、repost 0.8%、quote 0.7%；活动乘数调整后归一。候选 none 零调用，其余只允许执行或放弃。不能强制每轮出现反对、至少一条回复、至少两种 stance；否则制造虚假共识或虚假分歧。小样本熵只作诊断，不能作为必达数值。
+
+### 4.2 固定 schema 和证据链
+
+[完整 JSON Schema](prompts/tweet_report.schema.json) 定义所有字段、类型、枚举、必填、额外字段拒绝和条件约束。包含 scope/status、分母与动作统计、engagement、trigger_lines（原文跨度+群体+反应+证据）、top_replies（原话+模拟赞+被看到次数）、backlash_risk（等级+原因+群体+证据）、disagreement、2–3 rewrites（改动+预期+代价）、confidence/uncertainties 与降级原因。
+
+宿主确定档位与风险；报告模型仅组织解释。初版 uncalibrated 置信度为 low，不输出“87%会翻车”等未经校准概率。高赞预测展示为“模拟回复候选”，零赞或曝光不可比时明确未验证。改写均标 `simulation_verified=false`；若用户主动重跑改写，创建新预算的新 run，不能偷偷多跑两轮验证改写。
+
+本地依次做 JSON/schema/证据/统计/状态校验；一次修复仍失败则降级，同一 schema 返回、原因可见。complete 必须 2–3 个改写；degraded/failed 可少于 2，不能为了凑字段编造。模板和修复策略详见 [README](prompts/README.zh.md)、[报告模板](prompts/tweet_report.zh.md)。
+
+### 4.3 eval harness
+
+完整流程见 [eval.zh.md](prompts/eval.zh.md)。先搭确定性契约集，再收集 30 条带真实反响证据的授权历史推文，冻结 20 dev / 10 holdout；原文、窗口、互动数、曝光、作者基线、真实触发句与风险标签分开存储。真实标签绝不进 prompt。当前没有真实数据，不得宣称固定集已建成或预测已验证。
+
+同输入同 seed 重跑 N=5：档位/风险众数一致率各 ≥0.8、编码样本方差 ≤0.3、不出现 low↔high；至少 80% 可判定样本达标，覆盖率 ≥90%。再用 N=10 不同 seed 报告抽样波动，不能要求同样稳定。证据和预算不变量 100%；真实对照报告 macro-F1、ordinal MAE、相关性、风险召回、触发句跨度 F1、回复主题命中和改写保意。数值阈值是拟定门禁，不是已实现能力；未达标保留实验标记，不改数据凑通过。
+
+## 5. 按依赖排序的里程碑
+
+执行模型是**开发任务推荐**，仅使用用户指定名单；不作模型能力/价格的实测排名。每项可独立 review，以下编号即推荐串行交付顺序。M0 同时启动真实数据收集；eval 契约从 M0 存在，不拖到末尾才设计。
+
+| 里程碑 | 依赖 | 难度 | 推荐执行模型 | 理由 |
+| --- | --- | --- | --- | --- |
+| M0 基线、契约与评估骨架 | 无 | 中 | `gpt-6-sol` | 整理现有路径、可复现环境、schema 与 mock |
+| M1 无 Zep 启动与持久任务 | M0 | 高 | `gpt-6-astra` high | 启动依赖、状态机、重启和幂等跨层联动 |
+| M2 角色 provider 与费用网关 | M1 | 很高 | `gpt-6-astra` xhigh | 并发预留、失败账务、CAMEL 多入口覆盖 |
+| M3 分层人群与推文动作循环 | M2 | 很高 | `gpt-6-astra` xhigh | 抽样偏差、沉默、可见性与证据语义耦合 |
+| M4 报告、提示词与回归闭环 | M3 | 高 | `gpt-6-astra` high | schema 外的语义校验及有限证据的表达 |
+| M5 中文产品页与单机体验 | M4 | 中 | `grok-4.7` | 在稳定 API 上完成常规 Vue 文案与交互 |
+| M6 通用模式本地图替换 | M2；按 M5 后交付 | 很高 | `gpt-6-astra` xhigh | 抽取、中文检索、时间来源、旧数据兼容 |
+| M7 历史验证、部署与合规发布 | M4、M5、M6、真实数据 | 高 | `gpt-6-astra` high | 跨链路验收、统计解释、版本与源码对应 |
+
+### M0：冻结事实与契约
+
+在用户已有 fork 工作区记录 commit、lockfile、实际运行命令和环境；用 Python 3.11/3.12、当前锁文件可工作的 Node 环境验证。不要把最低 Node 18 要求当成推荐长期部署版本。以 mock 测试全 none、无回复、恶意 ID、注入、预算耗尽等。引入 schema/模板/eval manifest，真实样本收集规则先定。
+
+基线命令在已有 fork 工作区执行：根目录 `npm ci`，前端 `npm ci --prefix frontend`、`npm run build --prefix frontend`；backend 目录 `uv sync --frozen`、`uv run pytest -q`。选择满足依赖范围的 Python 后执行，锁文件不自动升级。无凭据不执行付费上游流程。
+
+验收：后端既有测试与前端构建结果有原始日志；若失败记录基线缺陷、处理相关回归，不写死“130 个必须通过”。每条契约有合法与非法样例，schema 可解析并通过检查；源码基线 SHA 与依赖锁版本可追溯。没有密钥可完成此里程碑；上游真实云链路不作为此步阻塞项。
+
+### M1：配置隔离、任务与本地账本基础
+
+实现 2.1 的模式校验、延迟依赖、持久运行状态、幂等接口、取消/删除与失效任务处理，为 M2 留 budget_ledger 表。
+
+验收：不设置 ZEP_API_KEY 且阻断 Zep 网络，应用可启动、health 200、创建 mock 推文任务可完成；缺 LLM 配置返回中文配置错误而不是进程退出。相同幂等键不建重复任务，取消后无新增模拟动作，重启仍能读取状态，失效任务转 failed/degraded 而不永久 running。输入上限服务端生效。
+
+### M2：调用与费用不可绕过
+
+实现角色路由、能力档案、原子预留、计费结算与冻结价格；移除无上限重试。覆盖普通 LLMClient、直接 OpenAI、三份 OASIS 脚本、工具内部调用；所有费用/日志不含 secret。
+
+验收：两个 fake HTTP endpoint 验证不同角色路由；并发 8 个请求抢不足余额时，总已花费+预留+未知费用永不超限；无 usage、超时、崩溃重启、429 重试、报告保留额与 token 参数均有有界结果；第三次物理请求被拒。静态查找直连点并用网络替身验证无旁路。真实两供应商各一次小额 schema 冒烟单列结果，未提供凭据标“待验”，不冒充通过。
+
+### M3：模拟循环
+
+实现 120 槽位、多维配额、批量短人设、独立行动调用、三波公开时间线、本地 reply/quote/like、缺失与统计。接入 rule none 与受限候选，不调用主持人模型。
+
+验收：配额精确总和、固定 seed 的规则结果可复现；10,000 次规则曝光动作频率误差 ≤1 个百分点（活动权重另测）。四账号 mock 有回复、引用、划走和缺失各一条，用于覆盖分支，**不要求真实小样本必有这些动作**。未来/不可见 ID、自赞、重复提交被拒绝；prompt 中无其他人私人信息。默认 120×3 波的 mock 成功和预算截断场景均通过。
+
+### M4：报告与提示词闭环
+
+实现 schema 与语义校验、确定性档位/风险、top_replies 排序、有限修复与程序降级；接入 eval CLI 的确定性层。
+
+验收：complete 报告有 2–3 个不同保意改写；全部划走也合法完成且 top_replies 为空；假引用、错群体、quote 冒充 reply、emoji 偏移错误被拦截。失败修复一次后产生合法 degraded JSON，没有伪造补位。对固定真实或授权测试输入做 N=5 的调用实验并留记录；质量未过阈值须标实验，不能用漂亮 mock 证明预测效果。
+
+### M5：中文可用产品
+
+完成粘贴→预估→运行/取消→报告→证据查看/导出/删除；中文界面补漏、主/次入口和同源 API。关键状态均可从 mock 回放，不需付费点通所有页面。
+
+验收：桌面和窄屏浏览器完成完整流程；默认中文时无未列入白名单的用户可见英文残片（模型名/字段/代码除外）。预算、缺失与实验标记始终可见；提示注入文本按纯文本显示，无 XSS；移动端不横向挤出主要报告。用实际浏览器或 E2E 渲染检查，不能用 vite build 代替 UI 验收。
+
+### M6：本地图完整替代
+
+实现 2.4 全部接口与消费者适配，保留云后端只用于旧项目。中文抽取与来源、FTS 检索、删除及恢复作为主要风险处理。
+
+验收：阻断 Zep 域名且不提供其 key，1–2 KB 中文夹具走完整通用链路（mock LLM）并生成可追溯报告；抽取失败块可见且能重试。已标注 20 条中/繁/混合检索查询 recall@5 ≥0.9，包含两字实体与时间失效事实过滤。并发读写不丢事件；删除同时移除该图索引/缓存；旧云项目不被默认切换或误删。Zep mock 契约保留。再用真实模型跑 1 个小夹具验证抽取质量，费用受 M2 约束；失败则不宣称本地替代完成。
+
+### M7：历史验证与可分发版本
+
+完成真实数据集、冻结版本历史对照、两供应商冒烟、单机部署文档、来源和许可证入口。构建自己的镜像或本地可复现运行产物，不能用上游 latest 冒充 fork。
+
+验收：确定性硬门禁全过；真实 eval 输出指标/分子分母/区间和基线对比，达不到质量目标时只发布明确的实验备忘功能，不使用预测营销。独立 holdout 不参与调参。首次安装不需 Zep，可完成默认预演并查看/删除历史。发布工件包含可对应此版本的完整源码、构建安装脚本、LICENSE 和修改记录；对外服务有明显源码获取入口。没有真实数据/凭据时 M7 标未完成，不能勾成 done。
+
+## 6. AGPL、数据和发行边界
+
+仓库 [LICENSE](https://raw.githubusercontent.com/666ghj/MiroFish/main/LICENSE) 是 AGPLv3 文本。私下运行和修改不自动要求公开给所有人；分发修改版须遵守相应源码、声明与许可证要求；修改版提供远程网络交互时，应向这些用户显著提供该版本 Corresponding Source 的免费获取方式（第 13 条），不能只链接未修改上游。修改说明、构建脚本和必要安装材料纳入版本源码。AGPL 并不一概禁止收费或商业托管。[GNU 原文](https://www.gnu.org/licenses/agpl-3.0.txt)。
+
+软件许可证不自动取得历史推文、头像、商标或模型输出的再分发权。真实 eval 原始数据可以留在私有本地；公开仓库用合法夹具。保留上游版权/许可证与致谢；模型供应商条款、依赖许可证和品牌权利另列清单。远程开放前另做认证隔离与配额，不把“有 AGPL 源码链接”当作安全部署完成。
+
+## 7. 需要用户拍板的默认方案
+
+下表合并草稿第 6 节**实际 9 条**与本次新增事项；未回应不阻塞本计划定稿，实施默认按推荐值推进，涉及真实密钥/数据的验收仍如实待验。相同清单附于 REVIEW_NOTES 末尾。
+
+| ID | 决策 | 推荐默认值 | 理由 |
 | --- | --- | --- | --- |
-| 任意 OpenAI 兼容对话接口 | 是 | 按 token。界面文案写「常规模拟平均 5 美元/次」（`locales/zh.json` 的 `home.metricLowCostDesc`），这是原项目的估计，不是这次实测 | 示例配置指向阿里百炼 `qwen-plus`。换 Grok 或 GPT 只改 base URL 和模型名即可，前提是对方兼容 Chat Completions |
-| Zep Cloud | 今天是必须 | 按他们的套餐和额度。README 写每月免费额度够简单试用。本仓库没有写单价 | 建图的每个文本块、以及模拟中每批行为，都会变成云端 episode。抽取用的是 Zep 自己的模型，额度另算 |
-| OASIS / CAMEL | 是（Python 包） | 无单独授权费；贵在上面的大模型调用 | 版本钉死在 `camel-oasis==0.2.5` |
-| Docker 镜像 `ghcr.io/666ghj/mirofish:latest` | 只在用上游镜像时 | 拉取免费 | `docker-compose.yml` 用的是上游镜像，不是本 fork 现编的镜像 |
-| 其他 | 否 | | 没有数据库、没有 Redis、没有登录 |
-
-没有做这次实测的事：没有注册 Zep，没有打任何付费模型，所以不能给出「跑一则推文要多少钱」的实测数字。第 5 节给了估算口径，等 M2 加上计数后再填真实值。
-
-### 1.6 本地要怎么跑，需要哪些变量
-
-根目录 `.env.example`：
-
-```env
-LLM_API_KEY=...
-LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-LLM_MODEL_NAME=qwen-plus
-ZEP_API_KEY=...
-# 可选。不使用就不要留下这些行
-LLM_BOOST_API_KEY=...
-LLM_BOOST_BASE_URL=...
-LLM_BOOST_MODEL_NAME=...
-```
-
-`backend/run.py` 在启动时调用 `Config.validate()`。缺 `LLM_API_KEY` 或缺 `ZEP_API_KEY`，或者设置了 `ZEP_API_URL`，进程直接退出。所以没有这两把钥匙时，完整界面起不来。
-
-其他会读到的变量：
-
-- `FLASK_HOST`、`FLASK_PORT`（默认 5001）、`FLASK_DEBUG`、`SECRET_KEY`
-- `OASIS_DEFAULT_MAX_ROUNDS`（默认 10）
-- `VITE_API_BASE_URL`（前端直连后端时用；开发代理可以不设）
-- 上面那三个 `REPORT_AGENT_*` 目前写了但没被报告代码读
-
-Python 要求 `>=3.11,<3.13`。Node 要求 `>=18`。包管理：前端 npm，后端 uv（`npm run setup:all` 会两边都装）。
-
-源码跑法（README-ZH.md）：
-
-```bash
-cp .env.example .env   # 填入真实钥匙后再启动
-npm run setup:all
-npm run dev            # 前端 3000，后端 5001
-```
-
-Docker：
-
-```bash
-cp .env.example .env
-docker compose up -d
-```
-
-注意两点：
-
-- `docker-compose.yml` 的镜像是 `ghcr.io/666ghj/mirofish:latest`，跑的是上游，不是这个 fork 的工作区。要跑 fork，得用根目录 `Dockerfile` 自己构建。该 Dockerfile 最后执行的是 `npm run dev`，属于开发服务器，不是生产构建。
-- compose 只把 `./backend/uploads` 挂进容器。密钥来自 `.env`，不要把 `.env` 提交进 git。
-
-### 1.7 这次在环境里实际跑过什么
-
-机器上的版本：Python 3.12.3，Node v22.14.0，npm 10.9.7。开始时没有 `uv`，也没有 `docker`。为了装后端依赖，临时安装了 uv 0.12.20。没有写 `.env`，没有调用付费接口。
-
-| 动作 | 结果 |
-| --- | --- |
-| `backend` 下 `uv sync --frozen` | 成功。会装 torch 等大包，因为 camel-ai 依赖它们 |
-| `uv run pytest -q` | 130 通过，6 条来自 `zep_cloud` 类型注释的 SyntaxWarning |
-| 根目录和 `frontend` 的 `npm ci` | 成功。npm 报告前端依赖有 2 个漏洞（1 中 1 高），没有改依赖去修 |
-| `frontend` 下 `npx vite build` | 成功。有一张动态 import 提示和一个大于 500 kB 的包体积警告 |
-| 不设钥匙执行 `uv run python run.py` | 退出码 1，提示缺少 `LLM_API_KEY` 和 `ZEP_API_KEY` |
-| 用假钥匙创建 Flask 测试客户端，请求 `GET /health` | 200，`{"status":"ok","service":"MiroFish Backend"}` |
-| `docker compose up` | 没做。`docker` 命令不存在，也不能在没有钥匙的情况下完成一次真实模拟 |
-
-因此：安装、测试、前端构建、后端健康检查是实测。完整 Docker、Zep 建图、OASIS 多轮群演、报告质量都还没跑过，后面章节里关于运行时行为的描述来自读代码，以及对照 GitHub 上 `camel-oasis` v0.2.5 的源码（和 `pyproject.toml` 里的版本一致）。
-
----
-
-## 2. 改造方案
-
-四个改造彼此可拆开。推荐顺序写在第 4 节。推文模式可以先不依赖 Zep 替换，这样 M5 不必等 M3。
-
-### 2.1 全中文界面，输出默认中文
-
-现状：界面已经用 vue-i18n，`frontend/src/i18n/index.js` 默认 `localStorage` 没有语言时用 `zh`，回退也是 `zh`。`locales/zh.json` 覆盖了首页和大部分步骤。大模型提示词末尾也会加「请使用中文回答」。所以这不是从零做国际化，而是收尾，并改成中文优先产品，而不是「预测万物」的通用演示站。
-
-还没收干净的地方（读代码看到的，没有逐个像素核对浏览器）：
-
-- `frontend/src/views/MainView.vue` 的状态文字仍是英文：`Error`、`Ready`、`Building Graph`、`Generating Ontology`、`Initializing`，以及 `Step {{ n }}/5`。若干日志以 `Error:` 开头。
-- `SimulationView.vue`、`SimulationRunView.vue`、`ReportView.vue`、`InteractionView.vue` 在错误状态返回英文 `Error`。
-- `frontend/src/components/Step3Simulation.vue` 平台名写死为 `Info Plaza` / `Topic Community`，统计标签是 `ROUND`、`TIME`、`ACTS`，提示是 `Available Actions`。
-- 首页 GitHub 链接指向 `https://github.com/666ghj/MiroFish`（`frontend/src/views/Home.vue`）。
-- 语言切换器仍提供英、西、法、葡、俄、德（`locales/languages.json`）。中文优先不等于立刻删掉它们，但默认路径和文案应该先为中文服务。
-- 人设失败时的规则兜底是英文（`OasisProfileGenerator._generate_profile_rule_based`）。
-- OASIS 自带的行动提示词是英文，见第 3 节。只改界面语言不会让群演用中文思考。
-
-做法：
-
-1. 把上述硬编码收进 `locales/zh.json`，默认语言保持中文。
-2. 首页、步骤说明、按钮改成推文预演也能看懂的说法，同时留一个「通用模拟」入口，避免把后面的游戏/播客/故事堵死。
-3. 后端在推文模式忽略浏览器语言，报告和人设固定中文；通用模式仍尊重 `Accept-Language`。
-4. 规则兜底人设改成中文短句。
-5. 品牌和 GitHub 链接是否换成这个 fork，等你决定（开放问题）。
-
-要动的文件：`locales/zh.json`、`frontend/src/views/MainView.vue`、四个 `*View.vue`、`Step3Simulation.vue`、`Home.vue`，以及人设兜底函数。推文专用页面放到 2.4，不塞进这次扫尾。
-
-风险：有些字符串是日志和状态机用的，改文案时不要改状态枚举值（`created`、`running` 这些要保持英文机器值）。
-
-备选：继续维持七种语言并只补漏网英文。工作量更小，但和「中文优先产品」不一致。建议先补漏、把默认路径写成中文产品，语言包先留着不删。
-
-规模：S。若连首页叙事和步骤文案一起改成双入口（推文 / 通用），算 M，可以和 M5 的页面一起做。
-
-### 2.2 按角色选模型，并加上费用闸门
-
-现状已经能打任何 OpenAI 兼容接口，缺的是角色和闸门。
-
-建议的角色：
-
-| 角色 | 用途 | 模型倾向 |
-| --- | --- | --- |
-| `persona` | 一次生成整个人群 | 较强 |
-| `report` | 结案 JSON | 较强 |
-| `agent` | 每个模拟用户的每一轮 | 便宜、快 |
-| `ontology` / `extractor` | 通用模式的本体和本地抽图 | 中等 |
-| `moderator` | 可选，只负责叫醒谁 | 便宜；第一版可以不用模型 |
-
-配置形状（名字可以再定，语义如下）：
-
-```env
-LLM_API_KEY=...
-LLM_BASE_URL=...
-LLM_MODEL_NAME=...          # 默认兜底
-
-LLM_AGENT_API_KEY=...       # 可省略，省略则用上面的兜底
-LLM_AGENT_BASE_URL=...
-LLM_AGENT_MODEL_NAME=...
-
-LLM_REPORT_MODEL_NAME=...
-# persona、ontology 等同理
-
-SIM_MAX_AGENTS=24
-SIM_MAX_ROUNDS=4
-SIM_MAX_TOKENS_PER_CALL=800
-SIM_MAX_TOTAL_TOKENS=200000
-```
-
-做法：
-
-1. 在 `backend/app/utils/llm_client.py` 上加一个按角色取客户端的工厂，而不是到处 `OpenAI(api_key=Config.LLM_API_KEY)`。
-2. `oasis_profile_generator.py`、`simulation_config_generator.py`、`ontology_generator.py`、`report_agent.py`、`zep_tools.py` 改成问工厂要客户端。
-3. OASIS 那条路不要再写全局 `OPENAI_API_KEY`。要确认 camel 的模型对象在创建时复制了密钥。如果做不到，推文模式就不要用 camel 的工厂，改为我们自己的行动循环调用 `LLMClient`（见 2.4 的备选）。
-4. 每次调用记录角色、模型名、prompt token、completion token。模拟目录里落一个 `usage.json`。超过 `SIM_MAX_TOTAL_TOKENS` 就停，并在报告里说明是被闸门截断的。
-5. 推文模式的默认值用小数字（24 人、4 轮、只开 Twitter）。通用模式保留现在的双平台，但默认轮数不要再悄悄变成 72。
-
-风险：
-
-- 有的兼容接口不支持 `response_format`。`LLMClient.chat_json` 已经会在明确拒绝时降级。Grok 或别的兼容层仍可能在工具调用格式上和 camel 不一致。M2 要用假服务器测「角色 A 和角色 B 打到不同 URL」，M5 再用真实模型看工具调用。
-- 思考模型会把 token 花在隐藏推理上。人设和报告可以让供应商自己决定上限；agent 行动必须设小的 `max_tokens`，否则 24 人 × 4 轮也会很贵。
-- 不要把密钥写进模拟配置 JSON。现在配置文件会落到 `uploads/simulations/`，里面如果出现密钥，就容易被以后的日志或下载接口带出去。
-
-备选：只继续用现有的 `LLM_BOOST_*`，把 Twitter 指到便宜模型、报告指到贵模型。改动更小，但表达不了五个角色，也解决不了全局环境变量。不建议停在这一步。
-
-规模：M。
-
-### 2.3 去掉 Zep Cloud，换成可本地跑的记忆
-
-要保住的行为，不是保住 Zep 的 API 形状：
-
-- 输入一段文本和一份本体，得到实体和关系
-- 按类型把实体读出来，生成人设
-- 模拟过程中追加「后来发生了什么」
-- 报告能按关键词找到相关事实，最好还能带一点语义搜索
-- 删项目时把对应的图删掉
-
-推荐做法：加一个记忆接口（例如 `backend/app/services/memory/`），两种实现：
-
-- `zep`：把现在的调用包进去，测试继续能 mock 云端
-- `local`：SQLite 文件，例如 `uploads/graphs/<id>.sqlite`
-
-本地库的表够用即可：`nodes`、`edges`、`episodes`、可选的 `embeddings`。抽取不再交给 Zep，而交给 `extractor` 角色：把文本块和本体交给模型，要它返回 JSON 实体和关系，校验失败就丢弃该块并记日志。搜索先用 SQLite FTS5；语义搜索再用已经随 camel 装上的 sentence-transformers，在本机算向量，不另买嵌入接口。模拟行为写入 `episodes`，需要时再抽成新的边。
-
-环境变量建议：`MEMORY_BACKEND=local|zep`，默认在这个 fork 里改为 `local`。`ZEP_API_KEY` 只在 `zep` 时必填。`run.py` 的校验要跟着改，否则本地模式仍然起不来。
-
-要动的文件：`config.py`、`run.py`、`utils/zep.py`、`graph_builder.py`、`zep_entity_reader.py`、`zep_graph_memory_updater.py`、`zep_tools.py`、`oasis_profile_generator.py`（它会用 Zep 检索来补人设上下文）、`api/graph.py` 的删除逻辑，以及 `backend/tests/test_zep_*.py` 那一组。前端画图读的是 `/api/graph/data/<graph_id>`，只要这个 JSON 形状不变，`GraphPanel.vue` 可以不动。
-
-风险：
-
-- 这是四个改造里最大的一块。Zep 的抽取质量、时间有效性（`valid_at` / `invalid_at`）、混合搜索，本地第一版都会更糙。报告如果仍假设「图里什么都有」，会写出更空的章节。
-- 现有测试大量锁的是 Zep Cloud 的契约。应该保留契约测试给 `zep` 实现，给 `local` 另写一组用临时 SQLite 的测试，不要把云端测试改成永远跳过。
-- sentence-transformers 能离线算向量，但模型文件要下载。没网或没模型时，应自动退回 FTS5，而不是启动失败。
-- 不要在这一步引入 Neo4j 或另一套必须常驻的服务，除非本地抽取明显不够用。
-
-备选：
-
-1. 自建开源 Zep / Graphiti。行为最接近，但当前代码拒绝非云地址，而且通常要 Neo4j。对个人单机偏重。留作抽取质量不够时的退路。
-2. 推文模式完全不建图，只把 OASIS 的 SQLite 动作日志当记忆。通用模式暂时仍用 Zep。这能让推文先做出来。建议采纳这条作为 M5 的范围，M3 再替换通用模式的图。
-
-规模：L。
-
-### 2.4 一键「推文预演」
-
-不要把一则一两百字的草稿送进「上传研报 → 抽 10 类实体 → 双平台跑 72 小时」这条链路。那会又慢又贵，而且抽出来的实体往往不是「刷到这条推文的人」。
-
-建议新开一个模式，通用五步流程留着：
-
-- 新路由，例如 `/tweet`。表单字段：草稿正文、可选的发帖人自述、可选受众、语言（自动检测，允许手改）、人数、轮数。人数和轮数有上限，默认 24 和 4。
-- 后端新入口，例如 `POST /api/modes/tweet/run`，内部仍复用模拟目录、动作日志和报告存储，避免再造一套文件格式。
-- 人设来自配额表，不来自图谱。提示词见 `docs/prompts/tweet_persona.zh.md`。一次强模型调用生成全部人设。
-- 草稿作为唯一初始帖，用 `ManualAction` 写入，作者可以是一个不参与闲聊的「发帖账号」，避免发帖人自己和自己辩论。
-- 只开 Twitter 形态的广场。第一版动作：划走、点赞、转发、引用。回复若实验证明 `CREATE_COMMENT` 在 Twitter 库上可用，再打开；否则报告里的「回复」先收录引用帖，并在界面上叫「引用/回复」，不要假装有楼中楼。
-- 行动提示词用 `docs/prompts/tweet_agent_action.zh.md`，不要用 OASIS 英文默认提示词。`generate_twitter_agent_graph` 没有把自定义系统提示词暴露出来，所以推文模式应自己建 agent（OASIS 的 `SocialAgent` 支持 `user_info_template`），或在建图后替换系统消息。不要去改 site-packages。
-- 调度用规则，不用主持人模型。规则见 `docs/prompts/tweet_round_moderator.zh.md`。这样多数路人不会产生调用。
-- 报告不走现在的「未来预测、2 到 5 章、必须搜 Zep」。改为一次强模型调用，输入是动作日志，输出固定 JSON，再由前端渲染。草稿见 `docs/prompts/tweet_report.zh.md`。程序要检查引用是不是日志原文。
-- 模式注册做成小表：`id`、输入字段、人设来源、平台、报告格式。游戏购买、播客选题、故事续写以后各加一行，不改推文表单。
-
-要动的文件（实现时）：
-
-- 新增 `frontend/src/views/TweetPreview.vue`（名字待定）、路由、`frontend/src/api/` 里的一个模块
-- 新增 `backend/app/services/modes/tweet.py`（编排）、人设配额、报告校验
-- `backend/app/api/` 增加一个蓝图或挂在 `simulation` 下
-- `backend/scripts/run_parallel_simulation.py` 需要能「只跑 Twitter、使用外部人设、使用自定义系统提示词、使用更小的轮数」。能加参数就加参数，避免复制整个 1500 行脚本
-- 首页加一个主按钮进入推文模式
-
-风险：
-
-- OASIS 的 Twitter 环境提示词和工具调用是英文函数名。模型要同时看懂中文人设和英文工具名。需要在 M5 用真实模型跑一轮 4 人 × 1 轮的冒烟，看它会不会乱调用。
-- 如果 camel 的工具调用在目标模型上不稳定，备选是自写一个很短的行动循环：把时间线给 `LLMClient`，要求 JSON 动作，由我们写入一个自己的 SQLite。这会脱离 OASIS，但推文场景动作很少，循环大概一两百行。通用模式继续用 OASIS。这是推文模式的退路，不要一开始就重写社交平台。
-- 人设若仍按「每个实体一次 2000 字」去生成，24 人也是 24 次贵调用。推文模式必须改成一次批量生成。
-- 报告若仍鼓励「上帝视角预言未来」，模型会把 24 个玩具账号说成社会共识。提示词和校验都要压住这件事。
-
-规模：L。其中「表单 + 假数据报告」是 M，「接上真实群演」才是 L。
-
----
-
-## 3. 提示词
-
-### 3.1 现有提示词清单
-
-下面都在本仓库里，除非特别注明在 `camel-oasis` 0.2.5。
-
-| 位置 | 作用 | 主要问题 |
-| --- | --- | --- |
-| `ontology_generator.py` 的 `ONTOLOGY_SYSTEM_PROMPT` | 设计 10 个实体类型和一批关系 | 为「舆情事件当事人」设计，不适合「一条草稿的读者」。类型数量卡死。中英指令混在一起 |
-| `oasis_profile_generator.py` 的 `_get_system_prompt`、`_build_individual_persona_prompt`、`_build_group_persona_prompt` | 每个实体一份人设，要求 persona 约 2000 字 | 一人一次调用；过长；性别只许 male/female/other；失败兜底是英文；个人类型列表是学生/校友/教授，覆盖不了粉丝和路人 |
-| `simulation_config_generator.py` 的时间、事件、agent 活动三段提示词 | 生成作息、初始帖、立场和活跃度 | 立场只有 supportive/opposing/neutral/observer，没有「划走」。初始帖让模型编内容，推文模式应该用用户原稿。作息按 72 小时舆论事件设计 |
-| `report_agent.py` 的 `PLAN_*`、`SECTION_*`、`CHAT_*`、若干 ReACT 模板 | 未来预测报告，每章 3 到 5 次工具调用 | 鼓励把模拟写成「未来已经发生」。章节自由发挥，没有热度档和改写。引用必须翻译成报告语言，增加一轮改写误差。反思轮次是空常量 |
-| `zep_tools.py` 的子问题分解、选采访对象、出采访题、采访摘要 | 报告工具内部 | 仍假设有一张大图和一群事件当事人 |
-| `simulation.py` 的 `INTERVIEW_PROMPT_PREFIX` | 采访时禁止 agent 再调用工具 | 可用，但是通用采访，不是推文结案 |
-| camel-oasis `UserInfo.to_twitter_system_message` | 每个 Twitter agent 的系统提示词 | 英文；只有名字和整段 profile；原文还有语法问题（"Your have profile"）。每轮用户消息是 "Please perform social media actions..."，并鼓励不要只点赞。这会制造过多发言，也就是虚假的热闹 |
-| camel-oasis `SocialAgent.perform_action_by_llm` | 每轮把时间线塞给模型 | 时间线由环境生成，仓库控制不了文案。推文模式如果继续用它，只能换系统提示词，换不了每轮那句英文，除非自己包一层 |
-
-没有单独的「主持人」提示词。谁醒着，是 `get_active_agents_for_round` 用随机数和作息决定的。
-
-### 3.2 推文预演要改成什么样
-
-原则：
-
-- 人设一次生成，短，并且按配额分配角色。完整草稿在 `docs/prompts/tweet_persona.zh.md`。
-- 每个账号每轮的提示词只包含自己的短人设和公开时间线。完整草稿在 `docs/prompts/tweet_agent_action.zh.md`。
-- 调度第一版用规则，不增加一次模型调用。规则和可选的便宜模型版本在 `docs/prompts/tweet_round_moderator.zh.md`。
-- 结案只调用一次，输出固定 JSON。完整草稿在 `docs/prompts/tweet_report.zh.md`。前端再用同一份 JSON 渲染成可读备忘，不要让模型同时写两份容易互相矛盾的正文。
-
-多样性，针对中文 X 而不是微博热搜：
-
-- 中文用户里同时有路人、粉、黑、行业内部、媒体号、爱阴阳的 KOL。不要全部写成愤怒网友。
-- 语言风格分四档：口语、书面、中英夹杂、极短。配额里每种角色再错开风格，避免 24 个人同一套「家人们」。
-- 立场在生成前就定死，模型不许改配额。默认 24 人里路人 6 个，且 stance 为 `ignore`。
-- 每个人设写明「不知道别人的集体态度」。
-- 真实名人不要出现。影响力账号用虚构 KOL，bio 里标明虚构。
-- 喷子可以尖锐，提示词明确禁止威胁、色情和编造草稿里没有的数据。
-
-压低「全体同意」：
-
-- 行动提示词把划走写成默认，而不是把发言写成默认。这和 OASIS 原句 "don't limit your actions to just like" 相反，所以必须换掉原提示词。
-- 调度规则：如果上一轮没有反对意见，下一轮必须叫醒一个还没说话的反对或混合立场。
-- 报告禁止「舆论一边倒」，除非同时给出反对条数。样本小时写进 `caveats`。
-- 结案后的程序检查：引用必须能在日志里原样找到。编出来的金句丢掉。
-- 同一立场的人如果要表示同意，优先点赞，不要复读。
-
-费用：
-
-- 人设 1 次（强模型，输出大约 24 × 200 字）。
-- 行动：不是 24 × 4。`ignore` 和高门槛账号默认不调用。粗算第一轮约 10 次，后面每轮 6 到 8 次，4 轮大约 30 到 40 次便宜模型。每次输入是短人设加几条时间线，输出限制在大约 180 token。
-- 报告 1 次（强模型）。
-- 不跑 Reddit，不建 Zep 图，不给每个实体写 2000 字。
-- 硬上限见 2.2。超过就停，报告注明截断。
-
-下面是结案 JSON 的字段约定（与 `docs/prompts/tweet_report.zh.md` 一致）：
-
-```json
-{
-  "engagement_tier": "low | medium | high",
-  "tier_reason": "用动作计数说明",
-  "trigger_lines": [
-    {"text": "草稿原文片段", "polarity": "positive|negative|mixed", "why": "", "evidence_ids": []}
-  ],
-  "top_replies": [
-    {"evidence_id": "", "role": "", "text": "日志原文", "why_it_might_spread": ""}
-  ],
-  "backlash_risk": {"level": "low|medium|high", "triggers": [], "likely_frames": []},
-  "disagreement": {
-    "supportive_count": 0,
-    "opposing_count": 0,
-    "ignore_or_like_only_count": 0,
-    "note": ""
-  },
-  "rewrites": [
-    {"text": "完整改写", "intended_change": "避开哪一句"}
-  ],
-  "caveats": []
-}
-```
-
-热度档只描述这次模拟：发言少于 4 或划走超过 70% 为 low；发言不少于 10 且至少 3 种角色发了言为 high；其余 medium。不要输出「预测真实浏览量」。
-
-前端展示时把 JSON 渲染成五块：热度、刺点、可能被顶上来的回复、反噬、改写。`caveats` 始终展开，避免看起来像精确预测。
-
----
-
-## 4. 分阶段里程碑
-
-每一步都应该能单独合并、单独证明。建议顺序：M1 → M2 → M4 可以和 M2 并行 → M5（推文先不建图）→ M3（通用模式换成本地图）→ M6。M6 的夹具可以在 M5 之前就放进仓库，但没有真实跑数之前不要假装评估已完成。
-
-### M1 按上游方式在本地跑起来
-
-- 范围：不改产品行为。补一份「从零到健康检查」的记录即可，如果发现 README 和代码不一致，只改文档。
-- 验收：在有 Python 3.11 或 3.12、Node 18+、uv 的机器上，`uv sync --frozen` 后 `uv run pytest -q` 全部通过；`npx vite build` 成功；不设钥匙时 `run.py` 以缺少 `LLM_API_KEY` 和 `ZEP_API_KEY` 退出。若要证明完整链路，还需要你自己的两把钥匙，以及 Docker 或本机双进程：上传一份短 txt，把轮数压到 2，看到至少一个动作日志和一份报告。这一步本次没有钥匙、也没有 Docker，所以没有完成。
-- 难度：simple。
-
-### M2 角色模型层和费用闸门
-
-- 范围：工厂方法、环境变量、调用计数、超过总 token 就停止。用假的 HTTP 服务器测试，不要求真实钥匙。OASIS 脚本改为从工厂拿「agent」角色，并停止依赖进程级环境变量（若 camel 做不到，就在这一步记下来，把推文行动循环标成必须自写）。
-- 验收：测试里 persona 请求发到 URL A、agent 请求发到 URL B；模拟计数器在达到 `SIM_MAX_TOTAL_TOKENS` 后不再发请求；`uploads` 里的配置 JSON 不含密钥。现有 130 个测试仍然通过。
-- 难度：normal。
-
-### M3 本地图替换 Zep
-
-- 范围：`MEMORY_BACKEND=local` 的 SQLite 实现，覆盖建图、读实体、关键词搜索、写入模拟行为、删除。Zep 实现留着但不是默认。推文模式不依赖这一步。
-- 验收：用一份 1 到 2 KB 的夹具文本，在不设置 `ZEP_API_KEY` 的情况下跑完建图；SQLite 里能查到夹具中的实体名；搜索能返回该事实；追加一条模拟行为后能再搜到；`MEMORY_BACKEND=zep` 时原有 Zep 契约测试仍可在 mock 下通过。语义向量是加分项，FTS5 必须有。
-- 难度：hard。
-
-### M4 中文界面收尾
-
-- 范围：第 2.1 节列出的硬编码英文改为中文文案。默认语言保持中文。不在这一步做推文表单。
-- 验收：`vite build` 成功。在浏览器打开首页和模拟步，状态、按钮、平台名不再出现第 2.1 节那些英文残片（品牌名 MiroFish 可以保留）。把界面语言留在默认值时，后端收到的 `Accept-Language` 是 `zh`。本机可以用 Vite 预览加浏览器点选；如果没有浏览器，至少用组件测试或渲染后的 HTML 字符串检查这些词。
-- 难度：simple。
-
-### M5 推文模式和专用提示词
-
-- 范围：表单、配额人设、只跑短程广场、自定义行动提示词、固定 JSON 报告、引用校验。记忆用动作日志，不调用 Zep。提示词以 `docs/prompts/` 为起点，按冒烟结果再改。
-- 验收分两层：
-  1. 无真实模型：用假的大模型返回固定人设和固定动作，跑 4 个账号、1 轮，报告 JSON 通过校验，伪造的引用会被丢掉。
-  2. 有真实模型时再做一次冒烟：一则 80 字以内的中文草稿，不超过 8 个账号、1 轮，日志里同时出现「发言」和「划走」，报告里的 `top_replies[].text` 能在日志中原样找到。这一层需要你的 API 钥匙，没有钥匙就不能勾掉。
-- 难度：hard。
-
-### M6 评估夹具
-
-- 范围：`eval/tweets/` 下放小样本（见第 5 节），加一个脚本统计立场熵、划走比例、引用是否真实、三次重跑是否吵成一团、token 花费。不自动抓取别人的推文。
-- 验收：对一个假日志夹具，脚本输出上述指标且退出码 0；真实样本的结论由人看，脚本不负责宣布「预测准了」。
-- 难度：normal。
-
----
-
-## 5. 怎么判断模拟像不像样
-
-不要用「报告读起来通顺」当标准。通顺的报告最容易在编共识。
-
-准备一个小集，大约 8 到 12 则，由你提供，放在仓库里时去掉不该公开的账号和隐私。每则包含：
-
-- 当时的草稿原文
-- 你记得的真实结果，用定性标签就行：反响平淡、被支持、被抓住一句话攻击、出现了意料外的解读
-- 你事后认为最刺人的那半句
-- 不要要求系统预测点赞数
-
-每次跑完看四件事：
-
-1. **引用是真的。** 报告里的回复和刺点句子都能在日志或草稿里原样找到。这是机器可检查的，M5 就要做。
-2. **不是全体同意。** 划走加只点赞应该占多数。发言里至少能看到两种 stance。可以用立场分布的熵做一个下限：熵接近 0 就说明提示词或调度坏了。
-3. **重跑不会换一个世界。** 同一草稿用同一模型和同一配额跑 3 次。热度档允许差一档，反噬等级不应从 low 跳到 high。被点名的刺点句子应有重叠。完全不一致就不要拿去指导发布。
-4. **费用。** 每次记下调用次数、分角色 token、墙钟时间。推文模式的目标是：在默认 24 人、4 轮、只开广场的设置下，总 token 远小于现在「双平台 × 长人设 × 多轮 × 报告工具」的通用跑法。具体美元数等 M2 的 `usage.json` 和你选定的单价表再算，不要沿用界面上的 5 美元估计。
-
-已知结果只用来给人做对照，不要在提示词里写「这则后来翻车了」。否则模型是在背答案，不是在预演。
-
-样本太小，所以评估结论只能是「这套提示词会不会撒谎、会不会一边倒、贵不贵」，不能说「能预测 X 的真实传播」。
-
----
-
-## 6. 需要你拍板的问题
-
-1. 三个角色分别用哪家、哪个模型？至少需要：人群和报告用的强模型，群演用的便宜模型。base URL 是否都是 OpenAI 兼容（xAI、OpenAI，或别的中转）？
-2. 默认真的用 24 人、4 轮吗？你能接受的单次推文预演花费上限是多少（按人民币或美元）？闸门会按这个反推 token 上限。
-3. 第一版报告里的「回复」如果只能做成「引用转发」，能不能接受？还是必须先证明 OASIS 的 Twitter 库能写评论？
-4. 中文 X 的人群按哪一种来配：海外中文用户（中英夹杂、时政和科技圈更多），还是更接近微博口吻？这会直接改配额和语言风格。
-5. 通用五步流程还要不要留在首页？建议留，但推文按钮更靠前。若你希望这个 fork 只做推文，M3 可以再往后放。
-6. 本地记忆是否同意用 SQLite，而不是自建 Zep / Neo4j？默认 `MEMORY_BACKEND=local`。
-7. 界面品牌、Logo、GitHub 链接是否改成这个 fork？仓库名和文档标题要不要换掉 MiroFish？
-8. 评估用的历史草稿由谁提供？请不要在后续任务里要求代理去爬真实用户的 X 时间线。
-9. AGPL 之下，你是否只在自己机器上跑？如果要给别人开网页账号，需要另做授权和隔离设计，这次方案没有包含多用户。
+| D1 | 运行时供应商与模型 | persona/report 用 OpenAI GPT，agent 用 xAI Grok；API 型号按账户可用性、费用表与 eval 锁定；规则 moderator | 角色可替换，避免把开发执行模型名当已验证 API 或价格 |
+| D2 | 人数、轮次与费用 | 120 人/3 波，上限 240/4；$1/次、$5/日，UI 单次最高 $5 | 增加沉默样本而不线性增加行动调用；硬闸门优先 |
+| D3 | 回复能力与引擎 | 独立本地动作循环，首版真 reply；通用模式保留 OASIS | 避免引用代回复和依赖平台行为的不确定性 |
+| D4 | 受众与先验 | `zh_x_v1` 多圈层配额；90% none 候选先验；非真实人口分布 | 默认可审计，后续按历史数据校准 |
+| D5 | 产品范围 | 推文入口优先，保留通用次入口；其他模式暂不实现 | 保持聚焦，避免提前做泛化插件系统 |
+| D6 | 本地记忆与旧数据 | SQLite + 中文分词 FTS5；无向量模型；旧 Zep 图不自动迁移/删除 | 降低服务复杂度并避免不可逆数据损失 |
+| D7 | 品牌和链接 | 保留 MiroFish，副标题中文推文预演，主链接改 fork，保留上游致谢 | 先完成产品差异，减少品牌改造范围 |
+| D8 | 历史评估数据 | 用户自有/获授权 30 条，20 dev/10 holdout，固定窗口与来源证据 | 能对照真实结果且不靠爬虫或记忆编标签 |
+| D9 | 使用方式与 AGPL | 先本机单用户；对外开放前完成认证隔离和对应源码入口 | 控制部署范围并落实网络交互义务 |
+| D10 | 预测承诺与失败降级 | 未校准时仅模拟档/风险备忘，允许无回复；失败用同 schema degraded | 不把小样本、缺失数据写成确定预测 |
+| D11 | 数据保留与出站 | 本地 7 天可删除；仅发送到选定 LLM，关闭正文日志与自动抓链 | 草稿可能敏感，本地记忆仍有模型出站 |
+| D12 | 多样性与一致意见 | 保留配额和私有上下文，不强制反对、不强制发言 | 避免为了防趋同反而制造虚假分歧 |
+| D13 | 模型/价格变更 | 显式版本、价格 7 天刷新、能力探测与回归；禁止静默 fallback | 质量和费用都依赖具体版本 |

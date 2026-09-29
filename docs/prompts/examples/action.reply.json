@@ -1,0 +1,11 @@
+{
+  "action": "reply",
+  "target_id": "post_0",
+  "text": "写文档和写小说也是同一个标准吗？",
+  "expressed_stance": "opposing",
+  "trigger_span": {
+    "start": 0,
+    "end": 3,
+    "text": "所有人"
+  }
+}

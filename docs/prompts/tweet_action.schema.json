@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mirofish:tweet:action:v1",
+  "title": "action",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "none",
+        "like",
+        "reply",
+        "repost",
+        "quote"
+      ]
+    },
+    "target_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "text": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "expressed_stance": {
+      "type": "string",
+      "enum": [
+        "supportive",
+        "opposing",
+        "mixed",
+        "neutral",
+        "unexpressed"
+      ]
+    },
+    "trigger_span": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/span"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "action",
+    "target_id",
+    "text",
+    "expressed_stance",
+    "trigger_span"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "none"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target_id": {
+            "type": "null"
+          },
+          "text": {
+            "type": "null"
+          },
+          "trigger_span": {
+            "type": "null"
+          },
+          "expressed_stance": {
+            "const": "unexpressed"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "enum": [
+              "like",
+              "repost"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "text": {
+            "type": "null"
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "expressed_stance": {
+            "const": "unexpressed"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "enum": [
+              "reply",
+              "quote"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target_id": {
+            "const": "post_0"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140
+          },
+          "expressed_stance": {
+            "type": "string",
+            "enum": [
+              "supportive",
+              "opposing",
+              "mixed",
+              "neutral"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "repost"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target_id": {
+            "const": "post_0"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2000
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2000
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "text"
+      ]
+    }
+  }
+}

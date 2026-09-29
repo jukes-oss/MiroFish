@@ -1,0 +1,83 @@
+{
+  "schema_version": "1.0",
+  "run_id": "synthetic_partial",
+  "status": "degraded",
+  "scope": {
+    "kind": "simulation_only",
+    "audience_version": "zh_x_v1",
+    "behavior_prior_version": "silent_v1",
+    "seed": 42,
+    "planned_rounds": 3,
+    "completed_rounds": 1,
+    "calibrated": false,
+    "evidence_truncated": false
+  },
+  "metrics": {
+    "planned_agents": 120,
+    "exposed_agents": 40,
+    "evaluated_agents": 36,
+    "missing_agents": 4,
+    "action_counts": {
+      "none": 36,
+      "like": 0,
+      "reply": 0,
+      "repost": 0,
+      "quote": 0
+    },
+    "root_engaged_agents": 0,
+    "none_rate": 1,
+    "engagement_rate": 0
+  },
+  "usage": {
+    "currency": "USD",
+    "budget_microusd": 1000000,
+    "charged_microusd": 0,
+    "reserved_microusd": 0,
+    "uncertain_microusd": 0,
+    "billable_tokens": 0,
+    "physical_requests": 0,
+    "price_version": "synthetic_mock_v1",
+    "cost_basis": "provider_usage"
+  },
+  "engagement": {
+    "tier": "insufficient_data",
+    "tier_reason": "有效曝光规模不足，不能判定档位。",
+    "rate_interval": {
+      "lower": 0,
+      "upper": 0.1
+    },
+    "meaning": "仅描述当前模拟样本的互动，不预测真实浏览量或点赞数。"
+  },
+  "trigger_lines": [],
+  "top_replies": [],
+  "backlash_risk": {
+    "level": "insufficient_data",
+    "rule_version": "risk_rules_v1",
+    "issues": [],
+    "limitations": [
+      "没有观察到负面发言，不代表真实发布没有风险。"
+    ]
+  },
+  "disagreement": {
+    "views": [],
+    "silent_agents_are_not_supporters": true,
+    "note": "未产生可验证观点，四个缺失动作不能计作划走。"
+  },
+  "rewrites": [],
+  "confidence": {
+    "level": "low",
+    "calibration_status": "uncalibrated",
+    "basis": "合成契约示例，未经历史结果校准。",
+    "uncertainties": [
+      "受众比例是工程假设。",
+      "真实推荐算法和发布环境未知。",
+      "120个虚构账号不能代表中文X总体。"
+    ]
+  },
+  "limitations": [
+    "此例是合成测试，不是历史推文结果。"
+  ],
+  "degradation_reasons": [
+    "预算预留不足，后续曝光及报告生成未启动；这是程序生成的降级结果。"
+  ]
+}
