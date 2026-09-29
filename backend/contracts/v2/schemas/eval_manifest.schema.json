@@ -1,0 +1,293 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mirofish:eval:manifest:v2",
+  "title": "eval-manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "dataset_status": {
+      "type": "string",
+      "enum": [
+        "not_collected",
+        "collecting",
+        "frozen"
+      ]
+    },
+    "collection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authorized_historical_tweets": {
+          "const": 30
+        },
+        "dev_count": {
+          "const": 20
+        },
+        "holdout_count": {
+          "const": 10
+        },
+        "source_policy": {
+          "const": "owner_or_authorized_export_only"
+        },
+        "forbid_unsolicited_timeline_scrape": {
+          "const": true
+        },
+        "labels_excluded_from_prompt_retrieval_and_persona_cache": {
+          "const": true
+        },
+        "missing_counts_are_not_zero": {
+          "const": true
+        },
+        "cluster_by_author_and_time_before_split": {
+          "const": true
+        },
+        "holdout_not_used_for_tuning": {
+          "const": true
+        },
+        "observation_window_hours": {
+          "const": 48
+        }
+      },
+      "required": [
+        "authorized_historical_tweets",
+        "dev_count",
+        "holdout_count",
+        "source_policy",
+        "forbid_unsolicited_timeline_scrape",
+        "labels_excluded_from_prompt_retrieval_and_persona_cache",
+        "missing_counts_are_not_zero",
+        "cluster_by_author_and_time_before_split",
+        "holdout_not_used_for_tuning",
+        "observation_window_hours"
+      ]
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "mixed",
+              "subscription-only"
+            ]
+          }
+        },
+        "same_simulation_loop": {
+          "const": true
+        },
+        "shared_limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_calls_per_run": {
+              "const": 10
+            },
+            "max_wall_seconds_per_run": {
+              "const": 600
+            },
+            "day_max_requests": {
+              "const": 50
+            },
+            "llm_concurrency": {
+              "const": 1
+            }
+          },
+          "required": [
+            "max_calls_per_run",
+            "max_wall_seconds_per_run",
+            "day_max_requests",
+            "llm_concurrency"
+          ]
+        },
+        "routes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mixed": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "persona": {
+                  "const": "subscription_cli"
+                },
+                "agent": {
+                  "const": "ollama"
+                },
+                "report": {
+                  "const": "subscription_cli"
+                },
+                "ollama_model_id": {
+                  "const": "qwen3.8:27b-mxfp8"
+                },
+                "product_default": {
+                  "const": true
+                },
+                "scope": {
+                  "const": "product_default"
+                }
+              },
+              "required": [
+                "persona",
+                "agent",
+                "report",
+                "ollama_model_id",
+                "product_default",
+                "scope"
+              ]
+            },
+            "subscription-only": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "persona": {
+                  "const": "subscription_cli"
+                },
+                "agent": {
+                  "const": "subscription_cli"
+                },
+                "report": {
+                  "const": "subscription_cli"
+                },
+                "ollama_model_id": {
+                  "type": "null"
+                },
+                "product_default": {
+                  "const": false
+                },
+                "scope": {
+                  "const": "low_volume_eval_baseline"
+                }
+              },
+              "required": [
+                "persona",
+                "agent",
+                "report",
+                "ollama_model_id",
+                "product_default",
+                "scope"
+              ]
+            }
+          },
+          "required": [
+            "mixed",
+            "subscription-only"
+          ]
+        }
+      },
+      "required": [
+        "profiles",
+        "same_simulation_loop",
+        "shared_limits",
+        "routes"
+      ]
+    },
+    "cases": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "split": {
+            "type": "string",
+            "enum": [
+              "dev",
+              "holdout"
+            ]
+          },
+          "source_kind": {
+            "type": "string",
+            "enum": [
+              "owner_export",
+              "authorized_export"
+            ]
+          },
+          "permission_note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "case_id",
+          "split",
+          "source_kind",
+          "permission_note"
+        ]
+      }
+    },
+    "reality_note": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 400
+    }
+  },
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "dataset_status",
+    "collection",
+    "comparison",
+    "cases",
+    "reality_note"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "dataset_status": {
+            "const": "not_collected"
+          }
+        },
+        "required": [
+          "dataset_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cases": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "dataset_status": {
+            "const": "frozen"
+          }
+        },
+        "required": [
+          "dataset_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cases": {
+            "minItems": 30,
+            "maxItems": 30
+          }
+        }
+      }
+    }
+  ]
+}

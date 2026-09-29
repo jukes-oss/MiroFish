@@ -1,0 +1,29 @@
+command=npm run build --prefix frontend
+cwd=/workspace
+date=2026-09-29T10:01:03Z
+node=/home/ubuntu/.nvm/versions/node/v22.22.2/bin/node v22.22.2
+npm=/home/ubuntu/.nvm/versions/node/v22.22.2/bin/npm 10.9.7
+git_sha=39d849138ef254f6c737ab4c4705e5545dbe31d4
+
+> frontend@0.1.0 build
+> vite build
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 691 modules transformed.
+[plugin vite:reporter] 
+(!) /workspace/frontend/src/store/pendingUpload.js is dynamically imported by /workspace/frontend/src/views/Home.vue but also statically imported by /workspace/frontend/src/views/MainView.vue, dynamic import will not move module into another chunk.
+
+rendering chunks...
+computing gzip size...
+dist/index.html                                 1.02 kB │ gzip:   0.58 kB
+dist/assets/MiroFish_logo_left-Bf5baAoU.jpeg  600.90 kB
+dist/assets/index-7vLnMbyK.css                156.10 kB │ gzip:  23.74 kB
+dist/assets/index-BIoFxth0.js                 520.18 kB │ gzip: 167.37 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.50s
+exit=0

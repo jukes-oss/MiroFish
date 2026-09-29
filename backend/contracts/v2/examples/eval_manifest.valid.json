@@ -1,0 +1,50 @@
+{
+  "schema_version": "2.0",
+  "dataset_id": "zh_x_historical_v1",
+  "dataset_status": "not_collected",
+  "collection": {
+    "authorized_historical_tweets": 30,
+    "dev_count": 20,
+    "holdout_count": 10,
+    "source_policy": "owner_or_authorized_export_only",
+    "forbid_unsolicited_timeline_scrape": true,
+    "labels_excluded_from_prompt_retrieval_and_persona_cache": true,
+    "missing_counts_are_not_zero": true,
+    "cluster_by_author_and_time_before_split": true,
+    "holdout_not_used_for_tuning": true,
+    "observation_window_hours": 48
+  },
+  "comparison": {
+    "profiles": [
+      "mixed",
+      "subscription-only"
+    ],
+    "same_simulation_loop": true,
+    "shared_limits": {
+      "max_calls_per_run": 10,
+      "max_wall_seconds_per_run": 600,
+      "day_max_requests": 50,
+      "llm_concurrency": 1
+    },
+    "routes": {
+      "mixed": {
+        "persona": "subscription_cli",
+        "agent": "ollama",
+        "report": "subscription_cli",
+        "ollama_model_id": "qwen3.8:27b-mxfp8",
+        "product_default": true,
+        "scope": "product_default"
+      },
+      "subscription-only": {
+        "persona": "subscription_cli",
+        "agent": "subscription_cli",
+        "report": "subscription_cli",
+        "ollama_model_id": null,
+        "product_default": false,
+        "scope": "low_volume_eval_baseline"
+      }
+    }
+  },
+  "cases": [],
+  "reality_note": "真实授权历史推文尚未收集。本文件只冻结收集规则和两种通道对照，不表示固定集已经建成。"
+}

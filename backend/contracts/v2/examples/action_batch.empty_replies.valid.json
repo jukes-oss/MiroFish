@@ -1,0 +1,62 @@
+{
+  "input": {
+    "schema_version": "2.0",
+    "round": 1,
+    "items": [
+      {
+        "agent_id": "a001",
+        "persona": "平时关注工程实践，愿意给熟悉作者的好点子点个赞，但对没有边界的效率承诺会追问证据。用中文短句夹 benchmark 等术语，不因粉丝关系接受全部结论。没有实际使用经验时少下断言，也不会主动加入陌生人的争吵。",
+        "candidate_action": "like",
+        "visible_timeline": [
+          {
+            "id": "post_0",
+            "kind": "root_post",
+            "text": "所有人都该用AI写作。"
+          }
+        ],
+        "author_context": "",
+        "draft_text": "所有人都该用AI写作。"
+      },
+      {
+        "agent_id": "a002",
+        "persona": "看完多半会划走，只有句子本身让人想回一句才会开口。繁体和英文夹杂都算正常说话，不把身份当成立场。没有具体出处的数字不会跟着复述。",
+        "candidate_action": "reply",
+        "visible_timeline": [
+          {
+            "id": "post_0",
+            "kind": "root_post",
+            "text": "所有人都该用AI写作。"
+          }
+        ],
+        "author_context": "",
+        "draft_text": "所有人都该用AI写作。"
+      }
+    ]
+  },
+  "output": {
+    "schema_version": "2.0",
+    "round": 1,
+    "results": [
+      {
+        "agent_id": "a001",
+        "action": {
+          "action": "like",
+          "target_id": "post_0",
+          "text": null,
+          "expressed_stance": "unexpressed",
+          "trigger_span": null
+        }
+      },
+      {
+        "agent_id": "a002",
+        "action": {
+          "action": "none",
+          "target_id": null,
+          "text": null,
+          "expressed_stance": "unexpressed",
+          "trigger_span": null
+        }
+      }
+    ]
+  }
+}
