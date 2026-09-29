@@ -771,6 +771,8 @@ def finalize_report(
             *evidence["degradation_reasons"],
         ])
     _store_report(run_id, document)
+    if _is_cancelled(run_id):
+        cancelled = True
     if cancelled:
         run_status = "cancelled"
         error_code = "cancelled"
