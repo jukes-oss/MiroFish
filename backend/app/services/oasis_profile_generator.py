@@ -15,11 +15,10 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from openai import OpenAI
 from ..config import Config
+from ..providers.blocked import refuse_direct_model_call
 from ..utils.logger import get_logger
 from ..utils.locale import get_language_instruction, get_locale, set_locale, t
-from ..utils.openai_chat_compat import create_chat_completion, extract_chat_completion_text
 from ..utils.zep import (
     call_zep_read_with_retry,
     get_zep_client,
@@ -248,17 +247,11 @@ class OasisProfileGenerator:
         zep_api_key: Optional[str] = None,
         graph_id: Optional[str] = None
     ):
-        self.api_key = api_key or Config.LLM_API_KEY
-        self.base_url = base_url or Config.LLM_BASE_URL
-        self.model_name = model_name or Config.LLM_MODEL_NAME
-        
-        if not self.api_key:
-            raise ValueError("LLM_API_KEY 未配置")
-        
-        self.client = OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
-        )
+        del api_key, base_url, model_name
+        self.api_key = None
+        self.base_url = None
+        self.model_name = None
+        self.client = None
         
         # Zep客户端用于检索丰富上下文
         self.zep_api_key = zep_api_key or Config.ZEP_API_KEY
@@ -553,76 +546,8 @@ class OasisProfileGenerator:
         - 群体/机构实体：生成代表性账号设定
         """
         
-        is_individual = self._is_individual_entity(entity_type)
-        
-        if is_individual:
-            prompt = self._build_individual_persona_prompt(
-                entity_name, entity_type, entity_summary, entity_attributes, context
-            )
-        else:
-            prompt = self._build_group_persona_prompt(
-                entity_name, entity_type, entity_summary, entity_attributes, context
-            )
-
-        # 尝试多次生成，直到成功或达到最大重试次数
-        max_attempts = 3
-        last_error = None
-        
-        for attempt in range(max_attempts):
-            try:
-                response = create_chat_completion(
-                    self.client,
-                    model=self.model_name,
-                    messages=[
-                        {"role": "system", "content": self._get_system_prompt(is_individual)},
-                        {"role": "user", "content": prompt}
-                    ],
-                    response_format={"type": "json_object"},
-                    temperature=0.7 - (attempt * 0.1),  # 每次重试降低温度
-                    # 不设置max_tokens，让LLM自由发挥
-                )
-                
-                content = extract_chat_completion_text(response)
-                
-                # 检查是否被截断（finish_reason不是'stop'）
-                finish_reason = response.choices[0].finish_reason
-                if finish_reason == 'length':
-                    logger.warning(f"LLM输出被截断 (attempt {attempt+1}), 尝试修复...")
-                    content = self._fix_truncated_json(content)
-                
-                # 尝试解析JSON
-                try:
-                    result = json.loads(content)
-                    
-                    # 验证必需字段
-                    if "bio" not in result or not result["bio"]:
-                        result["bio"] = entity_summary[:200] if entity_summary else f"{entity_type}: {entity_name}"
-                    if "persona" not in result or not result["persona"]:
-                        result["persona"] = entity_summary or f"{entity_name}是一个{entity_type}。"
-                    
-                    return result
-                    
-                except json.JSONDecodeError as je:
-                    logger.warning(f"JSON解析失败 (attempt {attempt+1}): {str(je)[:80]}")
-                    
-                    # 尝试修复JSON
-                    result = self._try_fix_json(content, entity_name, entity_type, entity_summary)
-                    if result.get("_fixed"):
-                        del result["_fixed"]
-                        return result
-                    
-                    last_error = je
-                    
-            except Exception as e:
-                logger.warning(f"LLM调用失败 (attempt {attempt+1}): {str(e)[:80]}")
-                last_error = e
-                import time
-                time.sleep(1 * (attempt + 1))  # 指数退避
-        
-        logger.warning(f"LLM生成人设失败（{max_attempts}次尝试）: {last_error}, 使用规则生成")
-        return self._generate_profile_rule_based(
-            entity_name, entity_type, entity_summary, entity_attributes
-        )
+        del entity_name, entity_type, entity_summary, entity_attributes, context
+        refuse_direct_model_call("OASIS 人设不能直接调用付费 API")
     
     def _fix_truncated_json(self, content: str) -> str:
         """修复被截断的JSON（输出被max_tokens限制截断）"""

@@ -26,7 +26,7 @@ class Config:
     
     # LLM配置（统一使用OpenAI格式）
     LLM_API_KEY = os.environ.get('LLM_API_KEY')
-    LLM_BASE_URL = os.environ.get('LLM_BASE_URL', 'https://api.openai.com/v1')
+    LLM_BASE_URL = os.environ.get('LLM_BASE_URL', '')
     LLM_MODEL_NAME = os.environ.get('LLM_MODEL_NAME', 'gpt-4o-mini')
     
     # Zep配置

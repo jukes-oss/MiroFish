@@ -31,7 +31,10 @@ CREATE TABLE IF NOT EXISTS runs (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     started_at TEXT,
-    finished_at TEXT
+    finished_at TEXT,
+    capability_json TEXT,
+    wall_origin_ms INTEGER,
+    deadline_ms INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS exposures (
@@ -67,8 +70,27 @@ CREATE TABLE IF NOT EXISTS provider_requests (
     created_at TEXT NOT NULL,
     started_at TEXT,
     finished_at TEXT,
-    error_status TEXT
+    error_status TEXT,
+    attempt_kind TEXT,
+    day_key TEXT,
+    exit_code INTEGER,
+    http_status INTEGER,
+    token_usage_status TEXT,
+    queue_status TEXT,
+    truncated INTEGER NOT NULL DEFAULT 0,
+    internal_attempts INTEGER,
+    internal_accounting TEXT,
+    diagnostics_json TEXT,
+    deadline_ms INTEGER
 );
+
+CREATE TABLE IF NOT EXISTS gateway_lock (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    owner TEXT,
+    expires_ms INTEGER NOT NULL DEFAULT 0
+);
+
+INSERT OR IGNORE INTO gateway_lock (id, owner, expires_ms) VALUES (1, '', 0);
 
 CREATE TABLE IF NOT EXISTS budget_ledger (
     entry_id TEXT PRIMARY KEY,
@@ -105,15 +127,46 @@ def state_db_path() -> Path:
 def connect(path: Path | None = None) -> sqlite3.Connection:
     database = path or state_db_path()
     database.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(database, timeout=30)
+    conn = sqlite3.connect(database, timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
 
+_ADDED_COLUMNS = {
+    "runs": {
+        "capability_json": "TEXT",
+        "wall_origin_ms": "INTEGER",
+        "deadline_ms": "INTEGER",
+    },
+    "provider_requests": {
+        "attempt_kind": "TEXT",
+        "day_key": "TEXT",
+        "exit_code": "INTEGER",
+        "http_status": "INTEGER",
+        "token_usage_status": "TEXT",
+        "queue_status": "TEXT",
+        "truncated": "INTEGER NOT NULL DEFAULT 0",
+        "internal_attempts": "INTEGER",
+        "internal_accounting": "TEXT",
+        "diagnostics_json": "TEXT",
+        "deadline_ms": "INTEGER",
+    },
+}
+
+
+def _ensure_columns(conn: sqlite3.Connection) -> None:
+    for table, columns in _ADDED_COLUMNS.items():
+        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for name, declaration in columns.items():
+            if name not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+
+
 def init_db(path: Path | None = None) -> Path:
     database = path or state_db_path()
     with connect(database) as conn:
         conn.executescript(SCHEMA)
+        _ensure_columns(conn)
     return database

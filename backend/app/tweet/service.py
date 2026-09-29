@@ -8,6 +8,7 @@ import sqlite3
 import uuid
 from datetime import datetime, timezone
 
+from ..providers.profile import build_capability_profile, dump_profile
 from .channels import channel_config, channel_error_message, channel_problems
 from .db import ACTIVE_STATUSES, TERMINAL_STATUSES, connect, state_db_path
 
@@ -124,6 +125,14 @@ def create_run(payload: dict, *, idempotency_key: str) -> tuple[dict, bool]:
     if problems:
         raise TweetRunError(channel_error_message(problems), 400, "channel_config")
     normalized = normalize_input(payload)
+    selected = channel_config()
+    profile = build_capability_profile(
+        execution_profile=normalized["execution_profile"],
+        subscription_cli=normalized["subscription_cli"],
+        cli_path=selected["cli_path"],
+        ollama_base_url=selected["ollama_base_url"],
+        ollama_model=selected["ollama_model"],
+    )
     digest = request_hash(normalized)
     now = _now()
     with connect() as conn:
@@ -147,8 +156,8 @@ def create_run(payload: dict, *, idempotency_key: str) -> tuple[dict, bool]:
                 run_id, idempotency_key, request_hash, status, draft_text,
                 author_context, audience_version, agent_count, round_count,
                 execution_profile, subscription_cli, schema_version,
-                cancel_requested, created_at, updated_at
-            ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, '2.0', 0, ?, ?)
+                cancel_requested, created_at, updated_at, capability_json
+            ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, '2.0', 0, ?, ?, ?)
             """,
             (
                 run_id,
@@ -163,6 +172,7 @@ def create_run(payload: dict, *, idempotency_key: str) -> tuple[dict, bool]:
                 normalized["subscription_cli"],
                 now,
                 now,
+                dump_profile(profile),
             ),
             )
         except sqlite3.IntegrityError:
@@ -225,14 +235,16 @@ def provider_request_count(run_id: str) -> int:
 
 
 def cancel_run(run_id: str) -> dict:
+    from ..providers.registry import terminate_run
+
     now = _now()
     with connect() as conn:
         row = conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
         if row is None:
             raise TweetRunError("找不到这个运行。", 404, "not_found")
         if row["status"] in TERMINAL_STATUSES:
-            return _row_to_public(row)
-        if row["status"] == "queued":
+            public = _row_to_public(row)
+        elif row["status"] == "queued":
             conn.execute(
                 """
                 UPDATE runs
@@ -242,6 +254,9 @@ def cancel_run(run_id: str) -> dict:
                 WHERE run_id = ?
                 """,
                 (now, now, run_id),
+            )
+            public = _row_to_public(
+                conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
             )
         else:
             conn.execute(
@@ -253,8 +268,11 @@ def cancel_run(run_id: str) -> dict:
                 """,
                 (now, run_id),
             )
-        updated = conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
-    return _row_to_public(updated)
+            public = _row_to_public(
+                conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+            )
+    terminate_run(run_id)
+    return public
 
 
 def delete_run(run_id: str) -> None:
