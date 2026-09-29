@@ -145,6 +145,7 @@ _ADDED_COLUMNS = {
         "capability_json": "TEXT",
         "wall_origin_ms": "INTEGER",
         "deadline_ms": "INTEGER",
+        "run_kind": "TEXT NOT NULL DEFAULT 'tweet'",
     },
     "provider_requests": {
         "attempt_kind": "TEXT",

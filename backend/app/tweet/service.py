@@ -208,6 +208,7 @@ def list_runs(limit: int = 50) -> list[dict]:
                    execution_profile, created_at, finished_at, error_message,
                    substr(draft_text, 1, 40) AS draft_preview
             FROM runs
+            WHERE COALESCE(run_kind, 'tweet') = 'tweet'
             ORDER BY created_at DESC
             LIMIT ?
             """,
