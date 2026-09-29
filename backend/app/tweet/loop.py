@@ -16,11 +16,17 @@ from datetime import datetime, timezone
 
 from contracts.check_contracts import exact_id_coverage, load_schemas, schema_errors
 
-from ..providers.gateway import generate
-from ..providers.limits import REPORT_RESERVE_CALLS, REQUEST_TIMEOUT_SECONDS, RUN_MAX_REQUESTS
+from ..providers.gateway import _now_ms, generate
+from ..providers.limits import (
+    CLEANUP_RESERVE_SECONDS,
+    REPORT_RESERVE_CALLS,
+    REPORT_RESERVE_WALL_SECONDS,
+    REQUEST_TIMEOUT_SECONDS,
+    RUN_MAX_REQUESTS,
+)
 from .audience import build_slots, split_waves
 from .db import connect
-from .model_json import parse_model_object
+from .model_json import parse_model_object, persona_items
 from .sampling import draw_candidates, model_items
 
 logger = logging.getLogger("mirofish.tweet_loop")
@@ -140,7 +146,7 @@ def build_persona_payload(slots: list[dict], *, audience_version: str, seed: int
         "slots": public,
         "output_contract": {
             "schema_version": "2.0",
-            "shape": "只返回一个 JSON 对象，不要说明。",
+            "shape": "只返回一个 JSON 数组，每项一个人。不要 markdown，不要说明，字符串不要换行。",
             "display_name": "以虚构开头，不超过 12 个码点。",
             "bio": "不超过 16 个码点。",
             "persona": "60 个码点，写满即停，不要写到 120。",
@@ -177,6 +183,18 @@ def persona_call_seconds(slot_count: int) -> float:
     if slot_count < 0:
         raise ValueError("slot_count must be non-negative")
     return REQUEST_TIMEOUT_SECONDS * slot_count / FAILED_SINGLE_CALL_SLOTS
+
+
+def persona_repair_fits(seconds_left: float, *, persona_calls_after: int, wave_count: int) -> bool:
+    """Whether a persona repair can run to the 120s cap without dropping the wave.
+
+    Run 5bedc83304214c2d85e852c2d2ab352e: each repair was a second full CLI call
+    and was still running when the cap killed it. Budget the repair, every
+    persona call not yet sent, and every wave at that same cap.
+    """
+
+    later = max(0, persona_calls_after) + max(0, wave_count)
+    return seconds_left >= REQUEST_TIMEOUT_SECONDS * (1 + later)
 
 
 def persona_cache_key(profile: dict, payload: dict) -> str:
@@ -315,9 +333,45 @@ def _action_errors(item: dict, action: dict, draft: str) -> list[str]:
     return list(dict.fromkeys(codes))
 
 
+def _persona_document(text: str | None) -> dict | None:
+    """Accept the batch object, or the array / loose objects a CLI prints."""
+
+    if not isinstance(text, str):
+        return None
+    parsed = _parse_object(text)
+    parsed = _unwrap_cli_text(parsed)
+    if isinstance(parsed, dict) and isinstance(parsed.get("personas"), list):
+        return parsed
+    sources = [text]
+    if isinstance(parsed, dict):
+        for key in ("structured_output", "text", "thought"):
+            value = parsed.get(key)
+            if isinstance(value, dict) and isinstance(value.get("personas"), list):
+                return value
+            if isinstance(value, str):
+                sources.append(value)
+    for source in sources:
+        items = persona_items(source)
+        if items:
+            return {"personas": items}
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _unwrap_cli_text(document):
+    if not isinstance(document, dict) or isinstance(document.get("personas"), list):
+        return document
+    text = document.get("text")
+    if not isinstance(text, str):
+        return document
+    inner = _parse_object(text)
+    if isinstance(inner, dict) and isinstance(inner.get("personas"), list):
+        return inner
+    return document
+
+
 def interpret_personas(text: str | None, slots: list[dict]) -> tuple[dict[str, dict], list[dict]]:
     expected = [slot["agent_id"] for slot in slots]
-    document = _parse_object(text)
+    document = _persona_document(text)
     if document is None:
         return {}, [{"agent_id": agent_id, "codes": ["json"]} for agent_id in expected]
     personas = document.get("personas")
@@ -478,7 +532,21 @@ def _call_once(run_id, *, role, logical_batch, messages, kind, clock, on_step=No
     )
 
 
-def _call_with_one_repair(run_id, *, role, logical_batch, messages, clock, accept, on_step=None):
+def _non_report_seconds_left(run_id: str, clock) -> float | None:
+    with connect() as conn:
+        row = conn.execute("SELECT deadline_ms FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+    if row is None or row["deadline_ms"] is None:
+        return None
+    remain_ms = (
+        int(row["deadline_ms"])
+        - (REPORT_RESERVE_WALL_SECONDS * 1000)
+        - (CLEANUP_RESERVE_SECONDS * 1000)
+        - _now_ms(clock)
+    )
+    return remain_ms / 1000
+
+
+def _call_with_one_repair(run_id, *, role, logical_batch, messages, clock, accept, on_step=None, allow_repair=None):
     first = _call_once(
         run_id,
         role=role,
@@ -492,7 +560,10 @@ def _call_with_one_repair(run_id, *, role, logical_batch, messages, clock, accep
         return {"sent": False, "error": first.error_code, "locked": {}, "errors": [], "attempts": 0}
     locked, errors = accept(first.text)
     attempts = 1
-    if errors and first.status == "completed":
+    send_repair = bool(errors) and first.status == "completed"
+    if send_repair and allow_repair is not None:
+        send_repair = bool(allow_repair())
+    if send_repair:
         second = _call_once(
             run_id,
             role=role,
@@ -673,6 +744,16 @@ def _ensure_personas(run, slots, *, seed: int, clock, on_step=None) -> tuple[dic
         def accept(text: str | None, group=group):
             return interpret_personas(text, group)
 
+        def allow_repair(index=index, groups=groups, run_id=run["run_id"], clock=clock, waves=int(run["round_count"])):
+            seconds_left = _non_report_seconds_left(run_id, clock)
+            if seconds_left is None:
+                return True
+            return persona_repair_fits(
+                seconds_left,
+                persona_calls_after=len(groups) - index,
+                wave_count=waves,
+            )
+
         result = _call_with_one_repair(
             run["run_id"],
             role="persona",
@@ -681,6 +762,7 @@ def _ensure_personas(run, slots, *, seed: int, clock, on_step=None) -> tuple[dic
             clock=clock,
             accept=accept,
             on_step=on_step,
+            allow_repair=allow_repair,
         )
         if not result["sent"]:
             stopped_error = result["error"]

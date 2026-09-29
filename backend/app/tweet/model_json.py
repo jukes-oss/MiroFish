@@ -19,12 +19,50 @@ _TRAILING_COMMA = re.compile(r",(\s*[}\]])")
 _PREFERRED_KEYS = ("personas", "results", "rewrites")
 
 
+def relax_json_strings(text: str) -> str:
+    """Escape raw newlines inside JSON strings. Models wrap a 60-point persona."""
+
+    if not isinstance(text, str) or not text:
+        return text
+    pieces: list[str] = []
+    in_string = False
+    escape = False
+    for char in text:
+        if in_string:
+            if escape:
+                pieces.append(char)
+                escape = False
+                continue
+            if char == "\\":
+                pieces.append(char)
+                escape = True
+                continue
+            if char == '"':
+                pieces.append(char)
+                in_string = False
+                continue
+            if char == "\n":
+                pieces.append("\\n")
+                continue
+            if char == "\r":
+                continue
+            if char == "\t":
+                pieces.append("\\t")
+                continue
+            pieces.append(char)
+            continue
+        if char == '"':
+            in_string = True
+        pieces.append(char)
+    return "".join(pieces)
+
+
 def parse_model_object(text: str | None) -> dict | None:
     """Return the model object, or None when the reply has no JSON object."""
 
     if not isinstance(text, str):
         return None
-    cleaned = _THINKING.sub("", text.lstrip("\ufeff")).strip()
+    cleaned = _THINKING.sub("", relax_json_strings(text).lstrip("\ufeff")).strip()
     if not cleaned:
         return None
     whole = _parse_whole(cleaned)
@@ -123,6 +161,62 @@ def _dict_from_encoded_string(value: str) -> dict | None:
             return None
         current = loaded
     return None
+
+
+def persona_items(text: str | None) -> list[dict]:
+    """Persona objects a CLI actually prints: an array, a fence, or one object per line.
+
+    A bare array is not a batch for other roles. Callers that want personas
+    opt in here. Fields are only those the model wrote.
+    """
+
+    if not isinstance(text, str):
+        return []
+    cleaned = _THINKING.sub("", relax_json_strings(text).lstrip("\ufeff")).strip()
+    if not cleaned:
+        return []
+    for value in _values(cleaned, "["):
+        if not isinstance(value, list):
+            continue
+        items = [item for item in value if _persona_item(item)]
+        if items:
+            return items
+    found: list[dict] = []
+    seen: set[str] = set()
+    for value in _values(cleaned, "{"):
+        if isinstance(value, dict) and isinstance(value.get("personas"), list):
+            items = [item for item in value["personas"] if _persona_item(item)]
+            if items:
+                return items
+        if not _persona_item(value) or value["agent_id"] in seen:
+            continue
+        seen.add(value["agent_id"])
+        found.append(value)
+    return found
+
+
+def _values(text: str, opener: str):
+    decoder = json.JSONDecoder()
+    index = 0
+    length = len(text)
+    while index < length:
+        start = text.find(opener, index)
+        if start < 0:
+            return
+        loaded, consumed = _raw_value(decoder, text[start:])
+        if consumed is None:
+            index = start + 1
+            continue
+        yield loaded
+        index = start + consumed
+
+
+def _persona_item(value) -> bool:
+    if not isinstance(value, dict):
+        return False
+    if not isinstance(value.get("agent_id"), str) or not value.get("agent_id"):
+        return False
+    return any(isinstance(value.get(key), str) for key in ("display_name", "bio", "persona", "avoid_speaking_when"))
 
 
 def _rank(document: dict) -> int:
