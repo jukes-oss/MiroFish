@@ -1,0 +1,2861 @@
+{
+  "draft_text": "所有人都该用AI写作。",
+  "events": [
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x001",
+      "action_id": "r001",
+      "agent_id": "a001",
+      "round": 1,
+      "source": "llm",
+      "outcome": "completed",
+      "action": "reply",
+      "target_id": "post_0",
+      "text": "写文档和写小说也是同一个标准吗？",
+      "expressed_stance": "opposing",
+      "trigger_span": {
+        "start": 0,
+        "end": 3,
+        "text": "所有人"
+      },
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "tech"
+      ],
+      "candidate_action": "reply",
+      "request_id": "req_r001"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x002",
+      "action_id": "r002",
+      "agent_id": "a002",
+      "round": 1,
+      "source": "llm",
+      "outcome": "completed",
+      "action": "reply",
+      "target_id": "post_0",
+      "text": "不同人的写作需求不一样，为什么是所有人？",
+      "expressed_stance": "opposing",
+      "trigger_span": {
+        "start": 0,
+        "end": 3,
+        "text": "所有人"
+      },
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "feminist"
+      ],
+      "candidate_action": "reply",
+      "request_id": "req_r002"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x003",
+      "action_id": "q001",
+      "agent_id": "a003",
+      "round": 1,
+      "source": "llm",
+      "outcome": "completed",
+      "action": "quote",
+      "target_id": "post_0",
+      "text": "试着让AI帮忙起个草稿，倒也可以。",
+      "expressed_stance": "supportive",
+      "trigger_span": {
+        "start": 0,
+        "end": 3,
+        "text": "所有人"
+      },
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "quote",
+      "request_id": "req_q001"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x004",
+      "action_id": "re001",
+      "agent_id": "a004",
+      "round": 1,
+      "source": "llm",
+      "outcome": "completed",
+      "action": "repost",
+      "target_id": "post_0",
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": {
+        "start": 0,
+        "end": 3,
+        "text": "所有人"
+      },
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "repost",
+      "request_id": "req_re001"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x005",
+      "action_id": "n005",
+      "agent_id": "a005",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x006",
+      "action_id": "n006",
+      "agent_id": "a006",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x007",
+      "action_id": "n007",
+      "agent_id": "a007",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x008",
+      "action_id": "n008",
+      "agent_id": "a008",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x009",
+      "action_id": "n009",
+      "agent_id": "a009",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x010",
+      "action_id": "n010",
+      "agent_id": "a010",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x011",
+      "action_id": "n011",
+      "agent_id": "a011",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x012",
+      "action_id": "n012",
+      "agent_id": "a012",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x013",
+      "action_id": "n013",
+      "agent_id": "a013",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x014",
+      "action_id": "n014",
+      "agent_id": "a014",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x015",
+      "action_id": "n015",
+      "agent_id": "a015",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x016",
+      "action_id": "n016",
+      "agent_id": "a016",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x017",
+      "action_id": "n017",
+      "agent_id": "a017",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x018",
+      "action_id": "n018",
+      "agent_id": "a018",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x019",
+      "action_id": "n019",
+      "agent_id": "a019",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x020",
+      "action_id": "n020",
+      "agent_id": "a020",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x021",
+      "action_id": "n021",
+      "agent_id": "a021",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x022",
+      "action_id": "n022",
+      "agent_id": "a022",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x023",
+      "action_id": "n023",
+      "agent_id": "a023",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x024",
+      "action_id": "n024",
+      "agent_id": "a024",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x025",
+      "action_id": "n025",
+      "agent_id": "a025",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x026",
+      "action_id": "n026",
+      "agent_id": "a026",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x027",
+      "action_id": "n027",
+      "agent_id": "a027",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x028",
+      "action_id": "n028",
+      "agent_id": "a028",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x029",
+      "action_id": "n029",
+      "agent_id": "a029",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x030",
+      "action_id": "n030",
+      "agent_id": "a030",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x031",
+      "action_id": "n031",
+      "agent_id": "a031",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x032",
+      "action_id": "n032",
+      "agent_id": "a032",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x033",
+      "action_id": "n033",
+      "agent_id": "a033",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x034",
+      "action_id": "n034",
+      "agent_id": "a034",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x035",
+      "action_id": "n035",
+      "agent_id": "a035",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x036",
+      "action_id": "n036",
+      "agent_id": "a036",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x037",
+      "action_id": "n037",
+      "agent_id": "a037",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x038",
+      "action_id": "n038",
+      "agent_id": "a038",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x039",
+      "action_id": "n039",
+      "agent_id": "a039",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x040",
+      "action_id": "n040",
+      "agent_id": "a040",
+      "round": 1,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x041",
+      "action_id": "n041",
+      "agent_id": "a041",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x042",
+      "action_id": "n042",
+      "agent_id": "a042",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x043",
+      "action_id": "n043",
+      "agent_id": "a043",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x044",
+      "action_id": "n044",
+      "agent_id": "a044",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x045",
+      "action_id": "n045",
+      "agent_id": "a045",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x046",
+      "action_id": "n046",
+      "agent_id": "a046",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x047",
+      "action_id": "n047",
+      "agent_id": "a047",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x048",
+      "action_id": "n048",
+      "agent_id": "a048",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x049",
+      "action_id": "n049",
+      "agent_id": "a049",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x050",
+      "action_id": "n050",
+      "agent_id": "a050",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x051",
+      "action_id": "n051",
+      "agent_id": "a051",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x052",
+      "action_id": "n052",
+      "agent_id": "a052",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x053",
+      "action_id": "n053",
+      "agent_id": "a053",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x054",
+      "action_id": "n054",
+      "agent_id": "a054",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x055",
+      "action_id": "n055",
+      "agent_id": "a055",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x056",
+      "action_id": "n056",
+      "agent_id": "a056",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x057",
+      "action_id": "n057",
+      "agent_id": "a057",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x058",
+      "action_id": "n058",
+      "agent_id": "a058",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x059",
+      "action_id": "n059",
+      "agent_id": "a059",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x060",
+      "action_id": "n060",
+      "agent_id": "a060",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x061",
+      "action_id": "n061",
+      "agent_id": "a061",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x062",
+      "action_id": "n062",
+      "agent_id": "a062",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x063",
+      "action_id": "n063",
+      "agent_id": "a063",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x064",
+      "action_id": "n064",
+      "agent_id": "a064",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x065",
+      "action_id": "n065",
+      "agent_id": "a065",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x066",
+      "action_id": "n066",
+      "agent_id": "a066",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x067",
+      "action_id": "n067",
+      "agent_id": "a067",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x068",
+      "action_id": "n068",
+      "agent_id": "a068",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x069",
+      "action_id": "n069",
+      "agent_id": "a069",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x070",
+      "action_id": "n070",
+      "agent_id": "a070",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x071",
+      "action_id": "n071",
+      "agent_id": "a071",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x072",
+      "action_id": "n072",
+      "agent_id": "a072",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x073",
+      "action_id": "n073",
+      "agent_id": "a073",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x074",
+      "action_id": "n074",
+      "agent_id": "a074",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x075",
+      "action_id": "n075",
+      "agent_id": "a075",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x076",
+      "action_id": "n076",
+      "agent_id": "a076",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x077",
+      "action_id": "n077",
+      "agent_id": "a077",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x078",
+      "action_id": "n078",
+      "agent_id": "a078",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x079",
+      "action_id": "n079",
+      "agent_id": "a079",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x080",
+      "action_id": "n080",
+      "agent_id": "a080",
+      "round": 2,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x081",
+      "action_id": "l001",
+      "agent_id": "a081",
+      "round": 3,
+      "source": "llm",
+      "outcome": "completed",
+      "action": "like",
+      "target_id": "r001",
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "like",
+      "request_id": "req_l001"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x082",
+      "action_id": "l002",
+      "agent_id": "a082",
+      "round": 3,
+      "source": "llm",
+      "outcome": "completed",
+      "action": "like",
+      "target_id": "post_0",
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "like",
+      "request_id": "req_l002"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x083",
+      "action_id": "l003",
+      "agent_id": "a083",
+      "round": 3,
+      "source": "llm",
+      "outcome": "completed",
+      "action": "like",
+      "target_id": "post_0",
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "like",
+      "request_id": "req_l003"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x084",
+      "action_id": "l004",
+      "agent_id": "a084",
+      "round": 3,
+      "source": "llm",
+      "outcome": "completed",
+      "action": "like",
+      "target_id": "post_0",
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "like",
+      "request_id": "req_l004"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x085",
+      "action_id": "l005",
+      "agent_id": "a085",
+      "round": 3,
+      "source": "llm",
+      "outcome": "completed",
+      "action": "like",
+      "target_id": "post_0",
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "like",
+      "request_id": "req_l005"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x086",
+      "action_id": "l006",
+      "agent_id": "a086",
+      "round": 3,
+      "source": "llm",
+      "outcome": "completed",
+      "action": "like",
+      "target_id": "post_0",
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "like",
+      "request_id": "req_l006"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x087",
+      "action_id": "l007",
+      "agent_id": "a087",
+      "round": 3,
+      "source": "llm",
+      "outcome": "completed",
+      "action": "like",
+      "target_id": "post_0",
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "like",
+      "request_id": "req_l007"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x088",
+      "action_id": "l008",
+      "agent_id": "a088",
+      "round": 3,
+      "source": "llm",
+      "outcome": "completed",
+      "action": "like",
+      "target_id": "post_0",
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "like",
+      "request_id": "req_l008"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x089",
+      "action_id": "n089",
+      "agent_id": "a089",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x090",
+      "action_id": "n090",
+      "agent_id": "a090",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x091",
+      "action_id": "n091",
+      "agent_id": "a091",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x092",
+      "action_id": "n092",
+      "agent_id": "a092",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x093",
+      "action_id": "n093",
+      "agent_id": "a093",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x094",
+      "action_id": "n094",
+      "agent_id": "a094",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x095",
+      "action_id": "n095",
+      "agent_id": "a095",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x096",
+      "action_id": "n096",
+      "agent_id": "a096",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x097",
+      "action_id": "n097",
+      "agent_id": "a097",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x098",
+      "action_id": "n098",
+      "agent_id": "a098",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x099",
+      "action_id": "n099",
+      "agent_id": "a099",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x100",
+      "action_id": "n100",
+      "agent_id": "a100",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x101",
+      "action_id": "n101",
+      "agent_id": "a101",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x102",
+      "action_id": "n102",
+      "agent_id": "a102",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x103",
+      "action_id": "n103",
+      "agent_id": "a103",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x104",
+      "action_id": "n104",
+      "agent_id": "a104",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x105",
+      "action_id": "n105",
+      "agent_id": "a105",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x106",
+      "action_id": "n106",
+      "agent_id": "a106",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x107",
+      "action_id": "n107",
+      "agent_id": "a107",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x108",
+      "action_id": "n108",
+      "agent_id": "a108",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x109",
+      "action_id": "n109",
+      "agent_id": "a109",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x110",
+      "action_id": "n110",
+      "agent_id": "a110",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x111",
+      "action_id": "n111",
+      "agent_id": "a111",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x112",
+      "action_id": "n112",
+      "agent_id": "a112",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x113",
+      "action_id": "n113",
+      "agent_id": "a113",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x114",
+      "action_id": "n114",
+      "agent_id": "a114",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x115",
+      "action_id": "n115",
+      "agent_id": "a115",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x116",
+      "action_id": "n116",
+      "agent_id": "a116",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x117",
+      "action_id": "n117",
+      "agent_id": "a117",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x118",
+      "action_id": "n118",
+      "agent_id": "a118",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x119",
+      "action_id": "n119",
+      "agent_id": "a119",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "synthetic_evidence",
+      "exposure_id": "x120",
+      "action_id": "n120",
+      "agent_id": "a120",
+      "round": 3,
+      "source": "rule",
+      "outcome": "completed",
+      "action": "none",
+      "target_id": null,
+      "text": null,
+      "expressed_stance": "unexpressed",
+      "trigger_span": null,
+      "visible_ids": [
+        "post_0",
+        "r001",
+        "r002"
+      ],
+      "group_ids": [
+        "casual"
+      ],
+      "candidate_action": "none",
+      "request_id": null
+    }
+  ]
+}

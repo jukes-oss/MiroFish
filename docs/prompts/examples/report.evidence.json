@@ -1,0 +1,205 @@
+{
+  "schema_version": "1.0",
+  "run_id": "synthetic_evidence",
+  "status": "complete",
+  "scope": {
+    "kind": "simulation_only",
+    "audience_version": "zh_x_v1",
+    "behavior_prior_version": "silent_v1",
+    "seed": 42,
+    "planned_rounds": 3,
+    "completed_rounds": 3,
+    "calibrated": false,
+    "evidence_truncated": false
+  },
+  "metrics": {
+    "planned_agents": 120,
+    "exposed_agents": 120,
+    "evaluated_agents": 120,
+    "missing_agents": 0,
+    "action_counts": {
+      "none": 108,
+      "like": 8,
+      "reply": 2,
+      "repost": 1,
+      "quote": 1
+    },
+    "root_engaged_agents": 11,
+    "none_rate": 0.9,
+    "engagement_rate": 0.09166666666666666
+  },
+  "usage": {
+    "currency": "USD",
+    "budget_microusd": 1000000,
+    "charged_microusd": 0,
+    "reserved_microusd": 0,
+    "uncertain_microusd": 0,
+    "billable_tokens": 0,
+    "physical_requests": 0,
+    "price_version": "synthetic_mock_v1",
+    "cost_basis": "provider_usage"
+  },
+  "engagement": {
+    "tier": "high",
+    "tier_reason": "120次有效曝光中有11个账号与原帖互动，模拟互动率约9.17%；另有1次点赞针对回复。",
+    "rate_interval": {
+      "lower": 0.09166666666666666,
+      "upper": 0.09166666666666666
+    },
+    "meaning": "仅描述当前模拟样本的互动，不预测真实浏览量或点赞数。"
+  },
+  "trigger_lines": [
+    {
+      "span": {
+        "start": 0,
+        "end": 3,
+        "text": "所有人"
+      },
+      "triggered_groups": [
+        "tech",
+        "feminist"
+      ],
+      "reaction_types": [
+        "skepticism"
+      ],
+      "explanation": "两个账号质疑统一要求适用于全部写作任务。",
+      "evidence_ids": [
+        "r001",
+        "r002"
+      ]
+    }
+  ],
+  "top_replies": [
+    {
+      "action_id": "r001",
+      "agent_id": "a001",
+      "text": "写文档和写小说也是同一个标准吗？",
+      "group_ids": [
+        "tech"
+      ],
+      "simulated_likes": 1,
+      "shown_to": 40,
+      "rank_basis": "simulated_like_rate",
+      "why_it_might_resonate": "用具体任务差异追问原文的适用边界。",
+      "limitation": "只有40次模拟曝光和1个赞，不能据此预测真实高赞。"
+    },
+    {
+      "action_id": "r002",
+      "agent_id": "a002",
+      "text": "不同人的写作需求不一样，为什么是所有人？",
+      "group_ids": [
+        "feminist"
+      ],
+      "simulated_likes": 0,
+      "shown_to": 40,
+      "rank_basis": "simulated_like_rate",
+      "why_it_might_resonate": "质疑对个人选择的统一要求。",
+      "limitation": "模拟中没有得到点赞，排序不能视为传播保证。"
+    }
+  ],
+  "backlash_risk": {
+    "level": "medium",
+    "rule_version": "risk_rules_v1",
+    "issues": [
+      {
+        "reason": "绝对化措辞引发两条明确质疑。",
+        "triggered_groups": [
+          "tech",
+          "feminist"
+        ],
+        "trigger_spans": [
+          {
+            "start": 0,
+            "end": 3,
+            "text": "所有人"
+          }
+        ],
+        "evidence_ids": [
+          "r001",
+          "r002"
+        ]
+      }
+    ],
+    "limitations": [
+      "局部负面表达不等于现实中的跨群体反噬。"
+    ]
+  },
+  "disagreement": {
+    "views": [
+      {
+        "interpretation": "写作任务不同，不宜要求所有人使用AI。",
+        "expressed_stance": "opposing",
+        "group_ids": [
+          "tech",
+          "feminist"
+        ],
+        "evidence_ids": [
+          "r001",
+          "r002"
+        ]
+      },
+      {
+        "interpretation": "把原帖理解为尝试辅助写作的邀请。",
+        "expressed_stance": "supportive",
+        "group_ids": [
+          "casual"
+        ],
+        "evidence_ids": [
+          "q001"
+        ]
+      }
+    ],
+    "silent_agents_are_not_supporters": true,
+    "note": "两条质疑与一条正面引用并存；108个划走账号的立场未知。"
+  },
+  "rewrites": [
+    {
+      "variant": "preserve_claim",
+      "text": "我想尝试用AI辅助写作。",
+      "what_changed": "保留使用AI写作的主张，改为个人计划。",
+      "changed_spans": [
+        {
+          "start": 0,
+          "end": 3,
+          "text": "所有人"
+        }
+      ],
+      "expected_effect": {
+        "hypothesis": "可能减少读者被要求接受统一标准的感觉。",
+        "tradeoff": "语气更弱，也可能减少讨论。",
+        "simulation_verified": false
+      }
+    },
+    {
+      "variant": "add_boundaries",
+      "text": "对一些初稿任务，可以试试用AI辅助写作。",
+      "what_changed": "将普遍要求收窄为具体任务中的可选方法。",
+      "changed_spans": [
+        {
+          "start": 0,
+          "end": 3,
+          "text": "所有人"
+        }
+      ],
+      "expected_effect": {
+        "hypothesis": "可能让建议的适用范围更清楚。",
+        "tradeoff": "不再保留原文强烈的号召语气。",
+        "simulation_verified": false
+      }
+    }
+  ],
+  "confidence": {
+    "level": "low",
+    "calibration_status": "uncalibrated",
+    "basis": "合成契约示例，未经历史结果校准。",
+    "uncertainties": [
+      "受众比例是工程假设。",
+      "真实推荐算法和发布环境未知。",
+      "120个虚构账号不能代表中文X总体。"
+    ]
+  },
+  "limitations": [
+    "此例是合成测试，不是历史推文结果。"
+  ],
+  "degradation_reasons": []
+}

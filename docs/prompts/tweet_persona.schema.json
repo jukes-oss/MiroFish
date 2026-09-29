@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mirofish:tweet:persona:v1",
+  "title": "persona",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "personas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "display_name": {
+            "type": "string",
+            "pattern": "^虚构",
+            "minLength": 3,
+            "maxLength": 30
+          },
+          "bio": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "persona": {
+            "type": "string",
+            "minLength": 60,
+            "maxLength": 120
+          },
+          "avoid_speaking_when": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          }
+        },
+        "required": [
+          "agent_id",
+          "display_name",
+          "bio",
+          "persona",
+          "avoid_speaking_when"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 20
+    }
+  },
+  "required": [
+    "personas"
+  ]
+}

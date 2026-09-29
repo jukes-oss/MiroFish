@@ -1,0 +1,74 @@
+{
+  "version": "zh_x_v1",
+  "status": "uncalibrated",
+  "agents": 120,
+  "max_agents": 240,
+  "rounds": 3,
+  "max_rounds": 4,
+  "persona_batch_size": 20,
+  "primary_group_counts": {
+    "tech": 20,
+    "crypto": 10,
+    "diaspora": 14,
+    "mainland": 14,
+    "hk_tw": 14,
+    "politics": 10,
+    "feminist": 6,
+    "anti_feminist": 4,
+    "humor": 8,
+    "marketing": 4,
+    "casual": 12,
+    "automation": 4
+  },
+  "marginal_counts": {
+    "relation": {
+      "fan": 18,
+      "stranger": 90,
+      "detractor": 12
+    },
+    "activity": {
+      "low": 84,
+      "medium": 30,
+      "high": 6
+    },
+    "language_style": {
+      "zh_hans_casual": 42,
+      "zh_hans_formal": 18,
+      "zh_hant": 24,
+      "mixed_zh_en": 24,
+      "terse_slang": 12
+    },
+    "reach": {
+      "ordinary": 108,
+      "kol": 8,
+      "institutional": 4
+    },
+    "predisposition": {
+      "receptive": 24,
+      "skeptical": 24,
+      "ambivalent": 24,
+      "disengaged": 48
+    },
+    "region_context": {
+      "mainland": 42,
+      "hong_kong": 12,
+      "taiwan": 18,
+      "overseas": 36,
+      "unspecified": 12
+    }
+  },
+  "behavior_prior_version": "silent_v1",
+  "candidate_probabilities": {
+    "none": 0.9,
+    "like": 0.07,
+    "reply": 0.015,
+    "repost": 0.008,
+    "quote": 0.007
+  },
+  "activity_multipliers": {
+    "low": 0.7,
+    "medium": 1.5,
+    "high": 2.7
+  },
+  "max_non_none_probability": 0.3
+}
