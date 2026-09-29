@@ -1,7 +1,9 @@
 """Single local worker for tweet runs.
 
-M1 only moves a checked run through the state machine. It does not generate
-personas, reactions, or reports, and it does not replay an unknown attempt.
+This walker only moves a checked run through the state machine. The tweet
+simulation loop lives in ``loop.py`` and is started by ``execute_loop``.
+Keeping it off this path preserves runs that are persisted and then drained
+without a model call. It does not replay an unknown attempt.
 """
 
 from __future__ import annotations

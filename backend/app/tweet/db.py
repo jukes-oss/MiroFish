@@ -109,6 +109,12 @@ CREATE TABLE IF NOT EXISTS artifacts (
     body_json TEXT,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS persona_cache (
+    cache_key TEXT PRIMARY KEY,
+    body_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 """
 
 ACTIVE_STATUSES = ("preparing", "running", "reporting")
