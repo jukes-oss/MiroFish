@@ -19,6 +19,7 @@ from ..providers.limits import PHYSICAL_STATUSES, RUN_MAX_REQUESTS, RUN_MAX_WALL
 from ..providers.profile import load_profile
 from .audience import build_slots
 from .db import TERMINAL_STATUSES, connect
+from .model_json import parse_model_object
 
 logger = logging.getLogger("mirofish.tweet_report")
 
@@ -48,16 +49,7 @@ def _dump(payload) -> str:
 
 
 def _parse_object(text: str | None) -> dict | None:
-    if not text:
-        return None
-    start = text.find("{")
-    if start < 0:
-        return None
-    try:
-        loaded, _end = json.JSONDecoder().raw_decode(text[start:])
-    except json.JSONDecodeError:
-        return None
-    return loaded if isinstance(loaded, dict) else None
+    return parse_model_object(text)
 
 
 def _span_ok(draft: str, span) -> bool:
@@ -120,13 +112,12 @@ def order_top_replies(replies: list[dict]) -> list[dict]:
     return ordered[:5]
 
 
-def semantic_problems(model: dict | None, evidence: dict) -> list[str]:
-    """Reject fake citations, the wrong circle, a quote shown as a reply, and a bad span."""
+def rewrite_problems(model: dict | None, evidence: dict) -> list[str]:
+    """Problems in the rewrites the host can keep. Citations are separate."""
 
     if not isinstance(model, dict):
         return ["json"]
     draft = evidence.get("draft") or ""
-    actions = evidence.get("actions") or {}
     problems: list[str] = []
     rewrites = model.get("rewrites")
     if not isinstance(rewrites, list) or not (2 <= len(rewrites) <= 3):
@@ -161,6 +152,17 @@ def semantic_problems(model: dict | None, evidence: dict) -> list[str]:
         problems.append("rewrite_variant")
     if len(texts) != len(set(texts)):
         problems.append("rewrite_text")
+    return list(dict.fromkeys(problems))
+
+
+def semantic_problems(model: dict | None, evidence: dict) -> list[str]:
+    """Reject fake citations, the wrong circle, a quote shown as a reply, and a bad span."""
+
+    problems = rewrite_problems(model, evidence)
+    if not isinstance(model, dict):
+        return problems
+    draft = evidence.get("draft") or ""
+    actions = evidence.get("actions") or {}
     problems.extend(_citation_problems(model, actions, draft))
     return list(dict.fromkeys(problems))
 
@@ -521,7 +523,7 @@ def _base_document(run, evidence: dict, usage_body: dict, *, seed: int, status: 
 
 
 def _clean_rewrites(model: dict | None, evidence: dict) -> list:
-    if not isinstance(model, dict) or semantic_problems(model, evidence):
+    if not isinstance(model, dict) or rewrite_problems(model, evidence):
         return []
     kept = []
     for item in model.get("rewrites") or []:
@@ -655,8 +657,13 @@ def _report_prompt(run, evidence: dict) -> dict:
         "host_risk_level": evidence["backlash_risk"]["level"],
         "reply_ids": [item["action_id"] for item in evidence["top_replies"]],
         "instruction": (
-            "只组织改写。改写 2 到 3 条且彼此不同，保留原意，"
-            "changed_spans 使用草稿的 Unicode 码点，simulation_verified 必须是 false。"
+            "只返回一个 JSON 对象，键只有 rewrites。不要输出 top_replies、trigger_lines、"
+            "disagreement、backlash_risk、evidence_ids，也不要输出第二个 JSON。"
+            "rewrites 为 2 到 3 条，variant 取 preserve_claim、add_boundaries、change_style 中互不相同的值。"
+            "每条含 variant、text、what_changed、changed_spans、expected_effect。"
+            "text 必须和草稿不同，且不得包含“这是预测”。"
+            "changed_spans 的 start、end、text 是草稿的 Unicode 码点切片，text 必须等于该切片。"
+            "expected_effect 含 hypothesis 和 tradeoff，simulation_verified 必须是 false。"
             f"未校准说明写成{MEMO_LABEL}。不要计算用量，不要编造证据编号。"
         ),
     }
@@ -705,7 +712,7 @@ def finalize_report(
         error = None if first.sent else first.error_code
         if first.sent and first.status == "completed":
             narrative = _parse_object(first.text)
-            problems = semantic_problems(narrative, evidence)
+            problems = rewrite_problems(narrative, evidence)
             if problems:
                 if on_step is not None:
                     on_step()
@@ -728,7 +735,7 @@ def finalize_report(
                 sent = sent or bool(second.sent)
                 if second.sent and second.status == "completed":
                     repaired = _parse_object(second.text)
-                    repaired_problems = semantic_problems(repaired, evidence)
+                    repaired_problems = rewrite_problems(repaired, evidence)
                     if not repaired_problems:
                         narrative = repaired
                         problems = []

@@ -246,6 +246,45 @@ def invoke_ollama(
     return _from_http(raw, status, max_output_bytes, started=True)
 
 
+def _part_text(part, *, include_thinking: bool) -> str:
+    if isinstance(part, str):
+        return part
+    if not isinstance(part, dict):
+        return ""
+    kind = str(part.get("type") or "").lower()
+    if kind in {"thinking", "reasoning"} and not include_thinking:
+        return ""
+    text = part.get("text")
+    if isinstance(text, str):
+        return text
+    content = part.get("content")
+    return content if isinstance(content, str) else ""
+
+
+def _content_text(content, *, include_thinking: bool) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(_part_text(part, include_thinking=include_thinking) for part in content)
+    return ""
+
+
+def _message_text(message: dict) -> str:
+    """Read assistant text. Use reasoning only when content itself is empty."""
+
+    raw = _content_text(message.get("content"), include_thinking=False)
+    if raw.strip():
+        return raw
+    for key in ("reasoning", "reasoning_content", "thinking"):
+        fallback = message.get(key)
+        if isinstance(fallback, str) and fallback.strip():
+            return fallback
+        joined = _content_text(fallback, include_thinking=True)
+        if joined.strip():
+            return joined
+    return raw
+
+
 def _from_http(raw: bytes, status: int, limit: int, *, started: bool) -> AdapterOutcome:
     truncated = len(raw) > limit
     payload = raw[:limit]
@@ -263,7 +302,7 @@ def _from_http(raw: bytes, status: int, limit: int, *, started: bool) -> Adapter
         if isinstance(choices, list) and choices:
             message = choices[0].get("message") if isinstance(choices[0], dict) else None
             if isinstance(message, dict):
-                text = str(message.get("content") or "")
+                text = _message_text(message)
         if not text and isinstance(loaded.get("error"), dict):
             text = ""
     error_code = None

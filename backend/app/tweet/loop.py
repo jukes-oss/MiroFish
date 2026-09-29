@@ -18,6 +18,7 @@ from contracts.check_contracts import exact_id_coverage, load_schemas, schema_er
 from ..providers.gateway import generate
 from .audience import build_slots, split_waves
 from .db import connect
+from .model_json import parse_model_object
 from .sampling import draw_candidates, model_items
 
 logger = logging.getLogger("mirofish.tweet_loop")
@@ -136,6 +137,15 @@ def build_persona_payload(slots: list[dict], *, audience_version: str, seed: int
         "language": "zh",
         "seed": seed,
         "slots": public,
+        "output_contract": {
+            "schema_version": "2.0",
+            "shape": "只返回一个 JSON 对象，键是 schema_version 和 personas。不要输出第二个 JSON，也不要加说明。",
+            "personas": "数组必须覆盖每一个 slot 的 agent_id，且不增加别的 id。每条只含 agent_id、display_name、bio、persona、avoid_speaking_when。",
+            "display_name": "以虚构开头，3 到 30 个码点。",
+            "bio": "1 到 40 个码点。",
+            "persona": "60 到 120 个码点。",
+            "avoid_speaking_when": "1 到 60 个码点。",
+        },
     }
 
 
@@ -180,13 +190,63 @@ def _cache_put(cache_key: str, personas: list[dict]) -> None:
 
 
 def _parse_object(text: str | None) -> dict | None:
-    if not text:
-        return None
-    try:
-        loaded = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    return loaded if isinstance(loaded, dict) else None
+    return parse_model_object(text)
+
+
+_PERSONA_FIELDS = ("agent_id", "display_name", "bio", "persona", "avoid_speaking_when")
+_ACTION_FIELDS = ("action", "target_id", "text", "expressed_stance", "trigger_span")
+_SPAN_FIELDS = ("start", "end", "text")
+
+
+def _normalize_persona_item(item: dict) -> dict:
+    """Keep known fields. Prefix 虚构 and trim overlong text. Do not pad a short persona."""
+
+    kept = {key: item[key] for key in _PERSONA_FIELDS if key in item}
+    name = kept.get("display_name")
+    if isinstance(name, str):
+        stripped = name.strip()
+        if stripped and not stripped.startswith("虚构"):
+            stripped = "虚构" + stripped
+        kept["display_name"] = stripped[:30]
+    for key, limit in (("bio", 40), ("persona", 120), ("avoid_speaking_when", 60)):
+        value = kept.get(key)
+        if isinstance(value, str) and len(value) > limit:
+            kept[key] = value[:limit]
+    return kept
+
+
+def _normalize_action(action: dict) -> dict:
+    kept = {key: action[key] for key in _ACTION_FIELDS if key in action}
+    span = kept.get("trigger_span")
+    if isinstance(span, dict):
+        kept["trigger_span"] = {key: span[key] for key in _SPAN_FIELDS if key in span}
+    return kept
+
+
+def _version_ok(document: dict, collection_key: str) -> bool:
+    if document.get("schema_version") == "2.0":
+        return True
+    if "schema_version" not in document and isinstance(document.get(collection_key), list):
+        return True
+    return False
+
+
+def _same_round(value, round_number: int) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int) and value == round_number:
+        return True
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip()) == round_number
+    return False
+
+
+def _result_rows(document: dict) -> list | None:
+    if isinstance(document.get("results"), list):
+        return document["results"]
+    if "results" not in document and isinstance(document.get("actions"), list):
+        return document["actions"]
+    return None
 
 
 def _action_errors(item: dict, action: dict, draft: str) -> list[str]:
@@ -231,7 +291,7 @@ def interpret_personas(text: str | None, slots: list[dict]) -> tuple[dict[str, d
     if document is None:
         return {}, [{"agent_id": agent_id, "codes": ["json"]} for agent_id in expected]
     personas = document.get("personas")
-    if document.get("schema_version") != "2.0" or not isinstance(personas, list):
+    if not _version_ok(document, "personas") or not isinstance(personas, list):
         return {}, [{"agent_id": agent_id, "codes": ["schema"]} for agent_id in expected]
     actual = [item.get("agent_id") if isinstance(item, dict) else None for item in personas]
     duplicates = {agent_id for agent_id in actual if actual.count(agent_id) > 1}
@@ -247,8 +307,7 @@ def interpret_personas(text: str | None, slots: list[dict]) -> tuple[dict[str, d
             code = "duplicate_id" if agent_id in duplicates else "missing_id"
             errors.append({"agent_id": agent_id, "codes": [code]})
             continue
-        item = dict(matches[0])
-        item.pop("persona_source", None)
+        item = _normalize_persona_item(matches[0])
         item_errors = schema_errors(_validators()["persona_batch"], {
             "schema_version": "2.0",
             "personas": [item],
@@ -279,12 +338,9 @@ def interpret_actions(
     document = _parse_object(text)
     if document is None:
         return {}, [{"agent_id": agent_id, "codes": ["json"]} for agent_id in expected]
-    results = document.get("results")
-    if (
-        document.get("schema_version") != "2.0"
-        or document.get("round") != round_number
-        or not isinstance(results, list)
-    ):
+    results = _result_rows(document)
+    version_ok = _version_ok(document, "results") or _version_ok(document, "actions")
+    if not version_ok or not _same_round(document.get("round"), round_number) or not isinstance(results, list):
         return {}, [{"agent_id": agent_id, "codes": ["schema"]} for agent_id in expected]
     if not expected:
         actual_ids = [
@@ -310,6 +366,7 @@ def interpret_actions(
         if not isinstance(action, dict):
             errors.append({"agent_id": agent_id, "codes": ["schema"]})
             continue
+        action = _normalize_action(action)
         codes = _action_errors(by_id[agent_id], action, draft)
         if codes:
             errors.append({"agent_id": agent_id, "codes": codes})
@@ -461,7 +518,20 @@ def _wave_input(round_number: int, items: list[dict], personas: dict[str, dict],
             "author_context": author,
             "draft_text": draft,
         })
-    return {"schema_version": "2.0", "round": round_number, "items": encoded}
+    return {
+        "schema_version": "2.0",
+        "round": round_number,
+        "items": encoded,
+        "output_contract": {
+            "schema_version": "2.0",
+            "round": round_number,
+            "shape": "只返回一个 JSON 对象，键是 schema_version、round、results。不要输出第二个 JSON。",
+            "results": "每条含 agent_id 和 action。action 只能是该条目的 candidate_action，或 none。不要把缺失填成 none。",
+            "none": "target_id、text、trigger_span 为 null，expressed_stance 为 unexpressed。",
+            "like_or_repost": "text 为 null，expressed_stance 为 unexpressed，target_id 必须是可见时间线上的 id。repost 的 target_id 是 post_0。",
+            "reply_or_quote": "target_id 必须是 post_0。text 为 1 到 140 个码点。trigger_span.text 必须等于草稿里对应的码点切片。不要编造时间线上不存在的目标。",
+        },
+    }
 
 
 def _insert_wave(run_id: str, round_number: int, wave_slots: list[dict], candidates: dict[str, str], locked: dict[str, dict], errors: list[dict]) -> None:
