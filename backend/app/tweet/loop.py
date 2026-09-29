@@ -1,9 +1,8 @@
 """One tweet simulation loop: slots, one persona call, one batch per wave.
 
 The loop uses the existing gateway. It does not call a moderator model and
-it does not send one request per account. A full report document is not
-produced here; the report role is one counted call whose body stays mock
-until the report milestone. ``advance_once`` does not enter this loop.
+it does not send one request per account. The worker enters this loop from
+``advance_once``. The report document is finalized by ``report.py``.
 """
 
 from __future__ import annotations
@@ -378,7 +377,9 @@ def _repair_note(errors: list[dict]) -> str:
     })
 
 
-def _call_once(run_id, *, role, logical_batch, messages, kind, clock):
+def _call_once(run_id, *, role, logical_batch, messages, kind, clock, on_step=None):
+    if on_step is not None:
+        on_step()
     logger.info("tweet loop call role=%s batch=%s kind=%s", role, logical_batch, kind)
     return generate(
         run_id,
@@ -390,7 +391,7 @@ def _call_once(run_id, *, role, logical_batch, messages, kind, clock):
     )
 
 
-def _call_with_one_repair(run_id, *, role, logical_batch, messages, clock, accept):
+def _call_with_one_repair(run_id, *, role, logical_batch, messages, clock, accept, on_step=None):
     first = _call_once(
         run_id,
         role=role,
@@ -398,6 +399,7 @@ def _call_with_one_repair(run_id, *, role, logical_batch, messages, clock, accep
         messages=messages,
         kind="generation",
         clock=clock,
+        on_step=on_step,
     )
     if not first.sent:
         return {"sent": False, "error": first.error_code, "locked": {}, "errors": [], "attempts": 0}
@@ -411,6 +413,7 @@ def _call_with_one_repair(run_id, *, role, logical_batch, messages, clock, accep
             messages=messages + [{"role": "user", "content": _repair_note(errors)}],
             kind="repair",
             clock=clock,
+            on_step=on_step,
         )
         attempts = 2
         if second.sent and second.status == "completed":
@@ -542,7 +545,7 @@ def _insert_wave(run_id: str, round_number: int, wave_slots: list[dict], candida
         conn.commit()
 
 
-def _ensure_personas(run, slots, *, seed: int, clock) -> tuple[dict[str, dict] | None, dict]:
+def _ensure_personas(run, slots, *, seed: int, clock, on_step=None) -> tuple[dict[str, dict] | None, dict]:
     profile = json.loads(run["capability_json"])
     payload = build_persona_payload(slots, audience_version=run["audience_version"], seed=seed)
     cache_key = persona_cache_key(profile, payload)
@@ -569,6 +572,7 @@ def _ensure_personas(run, slots, *, seed: int, clock) -> tuple[dict[str, dict] |
         messages=messages,
         clock=clock,
         accept=accept,
+        on_step=on_step,
     )
     if not result["sent"]:
         return None, {
@@ -602,29 +606,6 @@ def _ensure_personas(run, slots, *, seed: int, clock) -> tuple[dict[str, dict] |
     }
 
 
-def _host_stats(run_id: str) -> dict:
-    with connect() as conn:
-        exposures = conn.execute(
-            "SELECT COUNT(*) AS n FROM exposures WHERE run_id = ?",
-            (run_id,),
-        ).fetchone()["n"]
-        rows = conn.execute(
-            """
-            SELECT action, outcome, COUNT(*) AS n
-            FROM actions WHERE run_id = ?
-            GROUP BY action, outcome
-            """,
-            (run_id,),
-        ).fetchall()
-    counts = {"none": 0, "like": 0, "reply": 0, "repost": 0, "quote": 0, "missing": 0}
-    for row in rows:
-        if row["outcome"] == "missing" or row["action"] is None:
-            counts["missing"] += int(row["n"])
-        elif row["action"] in counts:
-            counts[row["action"]] += int(row["n"])
-    return {"exposures": int(exposures), "action_counts": counts}
-
-
 def execute_loop(
     run_id: str,
     *,
@@ -632,11 +613,15 @@ def execute_loop(
     clock=None,
     candidates: dict[str, str] | None = None,
     after_persona=None,
+    on_step=None,
 ) -> dict:
-    """Run personas and waves for one persisted run. Report text stays mock."""
+    """Run personas, waves, and one report finalization for a persisted run."""
+
+    from .report import finalize_report, finish_cancelled
 
     run = _load_run(run_id)
     if _cancelled(run_id):
+        finish_cancelled(run_id)
         return {"status": "cancelled", "run_id": run_id}
     with connect() as conn:
         existing = conn.execute(
@@ -655,7 +640,9 @@ def execute_loop(
         if missing:
             raise ValueError("候选覆盖必须包含每个槽位。")
     _update_run(run_id, status="preparing")
-    personas, persona_meta = _ensure_personas(run, slots, seed=seed, clock=clock)
+    if on_step is not None:
+        on_step()
+    personas, persona_meta = _ensure_personas(run, slots, seed=seed, clock=clock, on_step=on_step)
     if after_persona is not None:
         after_persona()
     summary = {
@@ -668,18 +655,25 @@ def execute_loop(
         "waves": [],
         "waves_skipped": [],
         "report_call": None,
-        "mock_only": ["model_text", "report_document"],
+        "mock_only": ["model_text"],
         "shared_context_risk": [],
     }
     if persona_meta.get("stopped") or personas is None:
-        summary["status"] = "degraded" if persona_meta.get("error") else "failed"
-        _update_run(
-            run_id,
-            status="degraded",
-            error_code=persona_meta.get("error") or "persona_not_sent",
-            error_message="人设调用没有发出，后续波次没有开始，也没有补写曝光。",
-            finished_at=_now(),
+        for round_number in range(1, int(run["round_count"]) + 1):
+            summary["waves_skipped"].append({
+                "round": round_number,
+                "reason": persona_meta.get("error") or "persona_not_sent",
+            })
+        outcome = finalize_report(
+            run,
+            seed=seed,
+            summary=summary,
+            clock=clock,
+            on_step=on_step,
+            complete_allowed=False,
         )
+        summary["status"] = outcome["run_status"]
+        summary["report_call"] = outcome["report_call"]
         _artifact(run_id, "loop_summary", summary)
         return summary
 
@@ -715,6 +709,7 @@ def execute_loop(
             messages=messages,
             clock=clock,
             accept=accept,
+            on_step=on_step,
         )
         if not result["sent"]:
             stop_error = result["error"] or "not_sent"
@@ -740,57 +735,23 @@ def execute_loop(
             "private_bleed": findings,
         })
 
-    report_body = {
-        "task": "report_stats",
-        "schema_version": "2.0",
-        "note": "统计由宿主计算。完整报告文档还没有实现，这次只占用一次报告调用。",
-        "draft_text": draft,
-        "stats": _host_stats(run_id),
-        "skipped_waves": summary["waves_skipped"],
-    }
-    report_sent = False
-    report_error = None
-    if stop_error != "cancelled" and not _cancelled(run_id):
-        _update_run(run_id, status="reporting")
-        report = _call_once(
-            run_id,
-            role="report",
-            logical_batch="report",
-            messages=[{"role": "user", "content": _dump(report_body)}],
-            kind="generation",
-            clock=clock,
-        )
-        report_sent = bool(report.sent)
-        report_error = None if report.sent else report.error_code
-        _artifact(run_id, "report_call", {
-            "sent": report_sent,
-            "error": report_error,
-            "mock_document": True,
-            "stats": report_body["stats"],
-        })
-    summary["report_call"] = {"sent": report_sent, "error": report_error, "mock_document": True}
-
-    missing = summary["persona"].get("fallback") or any(wave["errors"] for wave in summary["waves"])
-    if stop_error == "cancelled":
-        status = "cancelled"
-        error_code = "cancelled"
-        message = "已取消。未开始的波次没有发空调用，也没有补写曝光。"
-    elif summary["waves_skipped"] or summary["persona"].get("fallback") or missing or not report_sent:
-        status = "degraded"
-        error_code = "loop_degraded"
-        message = "模拟循环已结束。缺失条目保持缺失，没有改记为 none；未开始的波次没有补写曝光。报告正文仍是占位。"
-    else:
-        status = "complete"
-        error_code = None
-        message = None
-    summary["status"] = status
-    _update_run(
-        run_id,
-        status=status,
-        error_code=error_code,
-        error_message=message,
-        finished_at=_now(),
+    complete_allowed = (
+        stop_error != "cancelled"
+        and not _cancelled(run_id)
+        and not summary["waves_skipped"]
+        and not summary["persona"].get("fallback")
+        and not any(wave.get("errors") for wave in summary["waves"])
     )
+    outcome = finalize_report(
+        run,
+        seed=seed,
+        summary=summary,
+        clock=clock,
+        on_step=on_step,
+        complete_allowed=complete_allowed,
+    )
+    summary["status"] = outcome["run_status"]
+    summary["report_call"] = outcome["report_call"]
     _artifact(run_id, "loop_summary", summary)
-    logger.info("tweet loop finish status=%s", status)
+    logger.info("tweet loop finish status=%s", outcome["run_status"])
     return summary

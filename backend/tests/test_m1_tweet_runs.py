@@ -20,13 +20,14 @@ def _ready_channels(tmp_path, monkeypatch):
     cli = tmp_path / "grok"
     login = tmp_path / "login"
     cli.write_text("#!/bin/sh\n", encoding="utf-8")
+    cli.chmod(0o755)
     login.write_text("logged-in\n", encoding="utf-8")
     monkeypatch.setenv("TWEET_STATE_DB", str(tmp_path / "state.sqlite"))
     monkeypatch.setenv("TWEET_WORKER_MODE", "manual")
     monkeypatch.setenv("SUBSCRIPTION_CLI", "grok")
     monkeypatch.setenv("GROK_CLI_PATH", str(cli))
     monkeypatch.setenv("SUBSCRIPTION_CLI_LOGIN_PATH", str(login))
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://macbook.example:11434/v1")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://127.0.0.1:9/v1")
     monkeypatch.setenv("OLLAMA_MODEL", "qwen3.8:27b-mxfp8")
     monkeypatch.delenv("ZEP_API_KEY", raising=False)
     monkeypatch.delenv("LLM_API_KEY", raising=False)
@@ -74,20 +75,31 @@ def test_health_and_completed_run_need_no_zep_or_api_key(tmp_path, monkeypatch):
 
     fetched = client.get(f"/api/tweet/runs/{run_id}")
     assert fetched.status_code == 200
-    assert fetched.json["run"]["status"] == "complete"
+    assert fetched.json["run"]["status"] == "degraded"
     report = client.get(f"/api/tweet/runs/{run_id}/report")
     assert report.status_code == 200
-    assert report.json["report"] is None
-    assert "不生成" in report.json["message"]
+    document = report.json["report"]
+    assert document["schema_version"] == "2.0"
+    assert document["status"] == "degraded"
+    assert "模拟备忘" in document["confidence"]["basis"]
+    from contracts.check_contracts import check_report, load_schemas
+
+    _schemas, validators = load_schemas()
+    assert check_report(document, validators) == []
 
     with connect() as conn:
         actions = conn.execute("SELECT COUNT(*) AS n FROM actions").fetchone()["n"]
-        requests = conn.execute("SELECT COUNT(*) AS n FROM provider_requests").fetchone()["n"]
+        requests = conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM provider_requests
+            WHERE status IN ('completed', 'failed', 'uncertain', 'in_flight')
+            """
+        ).fetchone()["n"]
         columns = [row[1] for row in conn.execute("PRAGMA table_info(budget_ledger)")]
         mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
         foreign_keys = conn.execute("PRAGMA foreign_keys").fetchone()[0]
     assert actions == 0
-    assert requests == 0
+    assert requests > 0
     assert foreign_keys == 1
     assert str(mode).lower() == "wal"
     assert not any(name for name in columns if "usd" in name or "dollar" in name or name == "currency")

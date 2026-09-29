@@ -112,7 +112,59 @@ def render_output(document: dict, mode: str, repair: bool) -> str:
             ensure_ascii=False,
         )
     if task == "report_stats":
-        return json.dumps({"received": True}, ensure_ascii=False)
+        if mode == "bad-report":
+            return json.dumps(
+                {
+                    "rewrites": [{
+                        "variant": "preserve_claim",
+                        "text": "这是预测",
+                        "what_changed": "坏跨度",
+                        "changed_spans": [{"start": 1, "end": 3, "text": "👍"}],
+                        "expected_effect": {
+                            "hypothesis": "无",
+                            "tradeoff": "无",
+                            "simulation_verified": False,
+                        },
+                    }],
+                    "top_replies": [{
+                        "action_id": "act-fake",
+                        "agent_id": "a001",
+                        "text": "伪造回复",
+                        "group_ids": ["crypto"],
+                        "simulated_likes": 3,
+                        "shown_to": 1,
+                        "rank_basis": "simulated_like_rate",
+                        "why_it_might_resonate": "无",
+                        "limitation": "无",
+                    }],
+                },
+                ensure_ascii=False,
+            )
+        draft = document.get("draft_text") or "文"
+        snippet = draft[0]
+
+        def rewrite(variant, prefix, change):
+            return {
+                "variant": variant,
+                "text": prefix + draft,
+                "what_changed": change,
+                "changed_spans": [{"start": 0, "end": 1, "text": snippet}],
+                "expected_effect": {
+                    "hypothesis": "可能让语气更像个人说法。",
+                    "tradeoff": "号召感会变弱。",
+                    "simulation_verified": False,
+                },
+            }
+
+        return json.dumps(
+            {
+                "rewrites": [
+                    rewrite("preserve_claim", "个人觉得", "保留原来的意思，改成个人说法。"),
+                    rewrite("add_boundaries", "在一些情况下", "把适用范围收窄，原意还在。"),
+                ]
+            },
+            ensure_ascii=False,
+        )
     items = document.get("items") or []
     round_number = document.get("round")
     results = []
@@ -445,8 +497,16 @@ def test_default_120_by_3_cold_cache_is_five_calls(tmp_path, monkeypatch):
         assert len(seen_items) == 120 - len(none_ids)
         assert all(wave["physical_isolation"] is False for wave in summary["waves"])
         report = client.get(f"/api/tweet/runs/{run_id}/report")
-        assert report.json["report"] is None
-        assert "不生成" in report.json["message"]
+        document = report.json["report"]
+        from contracts.check_contracts import check_report, load_schemas
+
+        _schemas, validators = load_schemas()
+        assert check_report(document, validators) == []
+        assert document["schema_version"] == "2.0"
+        assert document["status"] == "complete"
+        assert document["engagement"]["meaning"].startswith("仅描述当前模拟样本")
+        assert "模拟备忘" in document["confidence"]["basis"]
+        assert 2 <= len(document["rewrites"]) <= 3
         persona_prompts = [prompt for prompt in env["brain"].prompts if '"task":"persona_batch"' in prompt]
         assert persona_prompts and all(DRAFT not in prompt for prompt in persona_prompts)
     finally:

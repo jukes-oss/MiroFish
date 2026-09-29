@@ -1,25 +1,27 @@
 """Single local worker for tweet runs.
 
-This walker only moves a checked run through the state machine. The tweet
-simulation loop lives in ``loop.py`` and is started by ``execute_loop``.
-Keeping it off this path preserves runs that are persisted and then drained
-without a model call. It does not replay an unknown attempt.
+A queued run is claimed and then ``execute_loop`` runs it. There is no
+second path that only walks status. An owned active run is not restarted,
+and a lost lease is never replayed.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import uuid
 from datetime import datetime, timezone
 
-from .db import ACTIVE_STATUSES, TERMINAL_STATUSES, connect
+from .db import ACTIVE_STATUSES, connect
+
+logger = logging.getLogger("mirofish.tweet_worker")
 
 WORKER_ID = uuid.uuid4().hex
 _thread_started = False
 _thread_lock = threading.Lock()
 LEASE_MS = 60_000
-STEP_ORDER = ("queued", "preparing", "running", "reporting", "complete")
+CALL_HOLD_MS = 120_000
 
 
 def _now_iso() -> str:
@@ -102,77 +104,89 @@ def _active_foreign_lease(conn, now_ms: int) -> bool:
     return row is not None
 
 
+class _FixedClock:
+    def __init__(self, now_ms: int):
+        self.now_ms = now_ms
+
+    def __call__(self) -> int:
+        return self.now_ms
+
+    def day_key(self) -> str:
+        moment = datetime.fromtimestamp(self.now_ms / 1000, tz=timezone.utc).astimezone()
+        return moment.strftime("%Y-%m-%d")
+
+
+def refresh_lease(run_id: str, now_ms: int, hold_ms: int = LEASE_MS) -> None:
+    """Extend this worker's lease. A foreign owner is left untouched."""
+
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE runs
+            SET worker_lease_expires_ms = ?, updated_at = ?
+            WHERE run_id = ? AND worker_lease_owner = ?
+              AND status IN ({})
+            """.format(",".join("?" for _ in ACTIVE_STATUSES)),
+            (int(now_ms) + int(hold_ms), _now_iso(), run_id, WORKER_ID, *ACTIVE_STATUSES),
+        )
+
+
 def advance_once(now_ms: int | None = None) -> bool:
-    """Move at most one run by one state. Return whether any run changed."""
+    """Claim one queued run and execute its loop. Do not only walk status."""
 
     current = _clock_ms(lambda: now_ms) if now_ms is not None else _clock_ms()
+    clock = _FixedClock(current) if now_ms is not None else None
     with connect() as conn:
         conn.execute("BEGIN IMMEDIATE")
         if _active_foreign_lease(conn, current):
             return False
         owned = conn.execute(
             f"""
-            SELECT * FROM runs
+            SELECT run_id FROM runs
             WHERE status IN ({",".join("?" for _ in ACTIVE_STATUSES)})
               AND worker_lease_owner = ?
-            ORDER BY updated_at
             LIMIT 1
             """,
             (*ACTIVE_STATUSES, WORKER_ID),
         ).fetchone()
-        if owned is None:
-            owned = conn.execute(
-                """
-                SELECT * FROM runs
-                WHERE status = 'queued' AND cancel_requested = 0
-                ORDER BY created_at
-                LIMIT 1
-                """
-            ).fetchone()
-            if owned is None:
-                return False
-        run_id = owned["run_id"]
-        fresh = conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
-        if fresh["status"] in TERMINAL_STATUSES:
+        if owned is not None:
             return False
+        queued = conn.execute(
+            """
+            SELECT run_id FROM runs
+            WHERE status = 'queued' AND cancel_requested = 0
+            ORDER BY created_at
+            LIMIT 1
+            """
+        ).fetchone()
+        if queued is None:
+            return False
+        run_id = queued["run_id"]
         now = _now_iso()
-        expires = current + LEASE_MS
-        if fresh["cancel_requested"]:
-            conn.execute(
-                """
-                UPDATE runs
-                SET status = 'cancelled', error_code = 'cancelled',
-                    error_message = '已取消，未发出新的模型请求。',
-                    worker_lease_owner = NULL, worker_lease_expires_ms = NULL,
-                    updated_at = ?, finished_at = ?
-                WHERE run_id = ?
-                """,
-                (now, now, run_id),
-            )
-            return True
-        try:
-            index = STEP_ORDER.index(fresh["status"])
-        except ValueError:
-            return False
-        if index >= len(STEP_ORDER) - 1:
-            return False
-        nxt = STEP_ORDER[index + 1]
-        started = fresh["started_at"] or (now if nxt != "queued" else None)
-        finished = now if nxt == "complete" else None
-        lease_owner = None if nxt in TERMINAL_STATUSES else WORKER_ID
-        lease_expires = None if nxt in TERMINAL_STATUSES else expires
-        conn.execute(
+        updated = conn.execute(
             """
             UPDATE runs
-            SET status = ?, started_at = ?, finished_at = ?,
-                worker_lease_owner = ?, worker_lease_expires_ms = ?,
-                updated_at = ?,
-                error_code = CASE WHEN ? = 'complete' THEN NULL ELSE error_code END,
-                error_message = CASE WHEN ? = 'complete' THEN NULL ELSE error_message END
-            WHERE run_id = ?
+            SET status = 'preparing', started_at = ?, updated_at = ?,
+                worker_lease_owner = ?, worker_lease_expires_ms = ?
+            WHERE run_id = ? AND status = 'queued' AND cancel_requested = 0
             """,
-            (nxt, started, finished, lease_owner, lease_expires, now, nxt, nxt, run_id),
+            (now, now, WORKER_ID, current + LEASE_MS + CALL_HOLD_MS, run_id),
         )
+        if updated.rowcount != 1:
+            return False
+    from .loop import execute_loop
+
+    def beat():
+        stamp = clock() if clock is not None else _clock_ms()
+        refresh_lease(run_id, stamp, LEASE_MS + CALL_HOLD_MS)
+
+    try:
+        execute_loop(run_id, seed=1, clock=clock, on_step=beat)
+    except Exception:
+        logger.info("tweet worker failed code=worker_exception")
+        from .report import write_closed_report
+
+        write_closed_report(run_id, "工作进程中断，没有自动重放，也没有编造报告正文。")
     return True
 
 
