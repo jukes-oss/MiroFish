@@ -10,12 +10,14 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import uuid
 from datetime import datetime, timezone
 
 from contracts.check_contracts import exact_id_coverage, load_schemas, schema_errors
 
 from ..providers.gateway import generate
+from ..providers.limits import REPORT_RESERVE_CALLS, REQUEST_TIMEOUT_SECONDS, RUN_MAX_REQUESTS
 from .audience import build_slots, split_waves
 from .db import connect
 from .model_json import parse_model_object
@@ -26,6 +28,11 @@ logger = logging.getLogger("mirofish.tweet_loop")
 ROOT_POST_ID = "post_0"
 REPAIR_MARKER = "MIROFISH_REPAIR"
 PUBLIC_KINDS = {"reply": "reply", "quote": "quote", "repost": "repost"}
+# Run 1900bc237dc94582a76689d515260094: one Grok CLI call for 12 personas
+# was still running when the 120s per-request cap killed it. Each new call
+# asks for at most one third of that batch.
+FAILED_SINGLE_CALL_SLOTS = 12
+PERSONA_CALL_MAX_SLOTS = FAILED_SINGLE_CALL_SLOTS // 3
 _VALIDATORS = None
 
 
@@ -117,18 +124,12 @@ def build_persona_payload(slots: list[dict], *, audience_version: str, seed: int
     for slot in slots:
         public.append({
             "agent_id": slot["agent_id"],
-            "circle": slot["circle"],
-            "circle_label": slot["circle_label"],
-            "relation": slot["relation"],
-            "relation_label": slot["relation_label"],
-            "activity": slot["activity"],
-            "activity_label": slot["activity_label"],
-            "language": slot["language"],
-            "language_label": slot["language_label"],
-            "influence": slot["influence"],
-            "influence_label": slot["influence_label"],
-            "prior_stance": slot["prior_stance"],
-            "prior_stance_label": slot["prior_stance_label"],
+            "circle": slot["circle_label"],
+            "relation": slot["relation_label"],
+            "activity": slot["activity_label"],
+            "language": slot["language_label"],
+            "influence": slot["influence_label"],
+            "prior_stance": slot["prior_stance_label"],
         })
     return {
         "task": "persona_batch",
@@ -139,14 +140,43 @@ def build_persona_payload(slots: list[dict], *, audience_version: str, seed: int
         "slots": public,
         "output_contract": {
             "schema_version": "2.0",
-            "shape": "只返回一个 JSON 对象，键是 schema_version 和 personas。不要输出第二个 JSON，也不要加说明。",
-            "personas": "数组必须覆盖每一个 slot 的 agent_id，且不增加别的 id。每条只含 agent_id、display_name、bio、persona、avoid_speaking_when。",
-            "display_name": "以虚构开头，3 到 30 个码点。",
-            "bio": "1 到 40 个码点。",
-            "persona": "60 到 120 个码点。",
-            "avoid_speaking_when": "1 到 60 个码点。",
+            "shape": "只返回一个 JSON 对象，不要说明。",
+            "display_name": "以虚构开头，不超过 12 个码点。",
+            "bio": "不超过 16 个码点。",
+            "persona": "60 个码点，写满即停，不要写到 120。",
+            "avoid_speaking_when": "不超过 16 个码点。",
         },
     }
+
+
+def persona_call_room(round_count: int) -> int:
+    """Persona generations that still leave one call per wave and the report reserve."""
+
+    return max(1, RUN_MAX_REQUESTS - REPORT_RESERVE_CALLS - max(1, round_count))
+
+
+def persona_slots_per_call(agent_count: int, round_count: int) -> int:
+    """Slots in one persona call. Shrink a 12-slot call only when the cap allows it."""
+
+    if agent_count < 1:
+        return 1
+    needed = math.ceil(agent_count / PERSONA_CALL_MAX_SLOTS)
+    if needed <= persona_call_room(round_count):
+        return PERSONA_CALL_MAX_SLOTS
+    return agent_count
+
+
+def persona_groups(slots: list[dict], round_count: int) -> list[list[dict]]:
+    size = persona_slots_per_call(len(slots), round_count)
+    return [slots[index:index + size] for index in range(0, len(slots), size)]
+
+
+def persona_call_seconds(slot_count: int) -> float:
+    """Time implied by the 12-slot call that was still running at the cap."""
+
+    if slot_count < 0:
+        raise ValueError("slot_count must be non-negative")
+    return REQUEST_TIMEOUT_SECONDS * slot_count / FAILED_SINGLE_CALL_SLOTS
 
 
 def persona_cache_key(profile: dict, payload: dict) -> str:
@@ -628,31 +658,46 @@ def _ensure_personas(run, slots, *, seed: int, clock, on_step=None) -> tuple[dic
             "fallback": False,
             "stopped": False,
         }
-    messages = [{"role": "user", "content": _dump(payload)}]
-    _artifact(run["run_id"], "persona_prompt", payload)
     expected = [slot["agent_id"] for slot in slots]
+    groups = persona_groups(slots, int(run["round_count"]))
+    locked: dict[str, dict] = {}
+    errors: list[dict] = []
+    attempts = 0
+    sent_any = False
+    stopped_error = None
+    for index, group in enumerate(groups, start=1):
+        payload = build_persona_payload(group, audience_version=run["audience_version"], seed=seed)
+        _artifact(run["run_id"], "persona_prompt", payload)
+        batch = "persona" if len(groups) == 1 else f"persona-{index}"
 
-    def accept(text: str | None):
-        return interpret_personas(text, slots)
+        def accept(text: str | None, group=group):
+            return interpret_personas(text, group)
 
-    result = _call_with_one_repair(
-        run["run_id"],
-        role="persona",
-        logical_batch="persona",
-        messages=messages,
-        clock=clock,
-        accept=accept,
-        on_step=on_step,
-    )
-    if not result["sent"]:
-        return None, {
-            "cache": "miss",
-            "calls": 0,
-            "fallback": False,
-            "stopped": True,
-            "error": result["error"],
-        }
-    personas = dict(result["locked"])
+        result = _call_with_one_repair(
+            run["run_id"],
+            role="persona",
+            logical_batch=batch,
+            messages=[{"role": "user", "content": _dump(payload)}],
+            clock=clock,
+            accept=accept,
+            on_step=on_step,
+        )
+        if not result["sent"]:
+            stopped_error = result["error"]
+            if not sent_any:
+                return None, {
+                    "cache": "miss",
+                    "calls": 0,
+                    "fallback": False,
+                    "stopped": True,
+                    "error": stopped_error,
+                }
+            break
+        sent_any = True
+        attempts += result["attempts"]
+        locked.update(result["locked"])
+        errors.extend(result["errors"])
+    personas = dict(locked)
     fallback_ids = [agent_id for agent_id in expected if agent_id not in personas]
     slot_by_id = {slot["agent_id"]: slot for slot in slots}
     for agent_id in fallback_ids:
@@ -660,7 +705,7 @@ def _ensure_personas(run, slots, *, seed: int, clock, on_step=None) -> tuple[dic
     ordered = [personas[agent_id] for agent_id in expected]
     _artifact(run["run_id"], "persona_batch", {
         "fallback_ids": fallback_ids,
-        "errors": result["errors"],
+        "errors": errors,
         "personas": ordered,
     })
     if not fallback_ids:
@@ -668,11 +713,11 @@ def _ensure_personas(run, slots, *, seed: int, clock, on_step=None) -> tuple[dic
     logger.info("tweet loop persona cache=miss fallback=%s", bool(fallback_ids))
     return personas, {
         "cache": "miss",
-        "calls": result["attempts"],
+        "calls": attempts,
         "fallback": bool(fallback_ids),
         "fallback_ids": fallback_ids,
         "stopped": False,
-        "errors": result["errors"],
+        "errors": errors,
     }
 
 

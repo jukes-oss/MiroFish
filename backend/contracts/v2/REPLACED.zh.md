@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `docs/prompts/tweet_persona.schema.json` | `personas.maxItems` 为 20，没有一批覆盖全部槽位的要求 | `schemas/tweet_persona_batch.schema.json`：`maxItems` 240，检查器用宿主槽位做精确 ID 覆盖 |
 | `docs/prompts/audience.defaults.json` | `persona_batch_size` 为 20 | 不再作为分批宽度。人数上限仍是 240，由人设数组上限表达 |
-| `docs/prompts/tweet_persona.zh.md` | 每批最多 20 人、默认 6 批 | `templates/persona_batch.zh.md`：完整槽位集一次生成 |
+| `docs/prompts/tweet_persona.zh.md` | 每批最多 20 人、默认 6 批 | `templates/persona_batch.zh.md`：调用次数够用时每次最多 4 人；120 人 3 波仍是一次调用 |
 | `docs/prompts/tweet_action.schema.json` | 作为一次只含一个账号的模型响应外层 | 同名字段保留为 `schemas/tweet_action.schema.json`，只嵌在 `results[].action` |
 | `docs/prompts/tweet_agent_action.zh.md` | 一请求一账号、HTTP 并发 4、禁止合并私有人设、默认 600 token 输出上限 | `templates/action_wave_batch.zh.md` 与波次输入/输出 schema。共享一次上下文，不再声称物理隔离 |
 | `docs/prompts/tweet_report.schema.json` 的 `usage` | `currency`、全部 `*_microusd`、`billable_tokens`、`price_version`、`cost_basis` | `schemas/tweet_report.schema.json` 的调用次数与墙钟 `usage`。不把这些美元字段填 0 留作假账 |

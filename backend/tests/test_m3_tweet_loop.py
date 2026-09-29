@@ -548,7 +548,8 @@ def test_empty_candidate_wave_sends_one_empty_batch_and_no_silent_requests(tmp_p
         summary = execute_loop(run_id, seed=2, clock=Clock(), candidates=candidates)
         assert [wave["model_items"] for wave in summary["waves"]] == [0, 0]
         assert _sent(run_id, "agent") == 2
-        assert _sent(run_id) == 4
+        assert _sent(run_id, "persona") == 2
+        assert _sent(run_id, "report") == 1
         actions = _actions(run_id)
         assert len(actions) == 6
         assert {row["source"] for row in actions} == {"rule"}
