@@ -365,12 +365,7 @@ def _sent(run_id: str, role: str | None = None) -> int:
 
 
 def seed_persona_cache(run_id: str, seed: int) -> None:
-    """Store personas without starting the persona CLI.
-
-    The tweet persona call is refused until the tool set is actually empty.
-    Wave and report tests still need personas, and the cache is the supported
-    way to reuse them without a new process.
-    """
+    """Store personas so a wave test can skip another persona CLI call."""
 
     from app.tweet.loop import _cache_put, persona_cache_key
 
@@ -539,11 +534,10 @@ def test_warm_cache_skips_the_persona_call(tmp_path, monkeypatch):
         first = _create(client, key="cold", draft=DRAFT)
         second = _create(client, key="warm", draft=DRAFT + "另一条")
         cold = execute_loop(first, seed=7, clock=Clock())
-        seed_persona_cache(second, seed=7)
         warm = execute_loop(second, seed=7, clock=Clock())
         assert cold["persona"]["cache"] == "miss"
-        assert cold["persona"]["stopped"] is True
-        assert _sent(first, "persona") == 0
+        assert cold["persona"]["stopped"] is False
+        assert _sent(first, "persona") == 1
         assert warm["persona"]["cache"] == "hit"
         assert warm["persona"]["calls"] == 0
         assert _sent(second) == 4
@@ -864,7 +858,7 @@ def test_subscription_only_uses_the_same_loop_on_the_chosen_cli(tmp_path, monkey
 
 def test_persona_repair_failure_uses_template_and_does_not_cache_it(tmp_path, monkeypatch):
     env = _ready(tmp_path, monkeypatch)
-    env["brain"].script = ["not-json", "not-json"]
+    env["brain"].script = ["not-json"]
     try:
         client = _app().test_client()
         run_id = _create(client, key="fallback", agent_count=2, round_count=1)
@@ -874,18 +868,27 @@ def test_persona_repair_failure_uses_template_and_does_not_cache_it(tmp_path, mo
             clock=Clock(),
             candidates={"a001": "none", "a002": "none"},
         )
-        assert summary["persona"]["stopped"] is True
-        assert summary["persona"]["fallback"] is False
-        assert summary["persona"]["calls"] == 0
-        assert _sent(run_id, "persona") == 0
+        assert summary["persona"]["stopped"] is False
+        assert summary["persona"]["fallback"] is True
+        assert summary["persona"]["calls"] == 1
+        assert _sent(run_id, "persona") == 1
         with connect() as conn:
             cached = conn.execute("SELECT COUNT(*) AS n FROM persona_cache").fetchone()["n"]
-            stored = conn.execute(
+            stored = json.loads(conn.execute(
                 "SELECT body_json FROM artifacts WHERE run_id = ? AND kind = 'persona_batch'",
                 (run_id,),
-            ).fetchone()
+            ).fetchone()["body_json"])
+            repairs = conn.execute(
+                """
+                SELECT COUNT(*) AS n FROM provider_requests
+                WHERE run_id = ? AND role = 'persona' AND attempt_kind = 'repair'
+                """,
+                (run_id,),
+            ).fetchone()["n"]
         assert cached == 0
-        assert stored is None
-        assert summary["waves_skipped"]
+        assert repairs == 0
+        assert stored["fallback_ids"] == ["a001", "a002"]
+        assert all(item["persona_source"] == "persona_fallback" for item in stored["personas"])
+        assert summary["waves_skipped"] == []
     finally:
         env["server"].shutdown()

@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 from contracts.check_contracts import exact_id_coverage, load_schemas, schema_errors
 
-from ..providers.gateway import _now_ms, _reject, generate
+from ..providers.gateway import _now_ms, generate
 from ..providers.limits import (
     CLEANUP_RESERVE_SECONDS,
     REPORT_RESERVE_CALLS,
@@ -39,19 +39,10 @@ PUBLIC_KINDS = {"reply": "reply", "quote": "quote", "repost": "repost"}
 # asks for at most one third of that batch.
 FAILED_SINGLE_CALL_SLOTS = 12
 PERSONA_CALL_MAX_SLOTS = FAILED_SINGLE_CALL_SLOTS // 3
-# grok 1.0.44 (5b807183dd79) was checked without sending a prompt to the model.
-# `grok --help` documents `--tools` as a comma-separated allowlist and
-# `--json-schema` as structured output (it implies `--output-format json`).
-# `grok -p … --tools '' --json-schema …` exits 1 with "Not signed in", not a
-# usage error, so the parser accepts an empty allowlist. The debug log stops
-# before `startup.agent_build.tool_registry`, so the resolved tool list was
-# not printed. The same binary's manual says the final toolset keeps the
-# requested tools plus always-on MCP meta-tools unless those meta-tools are
-# denied, and that an unmappable allowlist keeps the full grok toolset.
-# A denylist is not an empty set. The empty set was not observed, so the
-# tweet persona call is not started and is not sent as bare `grok -p`.
-PERSONA_TOOLSET_EMPTY = False
-PERSONA_NOT_STARTED = "persona_tools_not_empty"
+# grok 1.0.44 `--help` documents these persona flags. `--json-schema` constrains
+# the reply to that schema and implies `--output-format json`. `--no-memory`
+# is accepted by this binary (`grok --no-memory -h` exits 0). The persona
+# process is started with them. The report call does not receive them.
 _VALIDATORS = None
 
 
@@ -120,19 +111,21 @@ def persona_array_schema() -> dict:
 
 
 def persona_cli_extra_args() -> list[str]:
-    """Flags for a persona call whose tool set is actually empty.
-
-    Not passed to a process while ``PERSONA_TOOLSET_EMPTY`` is false.
-    """
+    """Flags after ``-p`` and the prompt for a tweet persona generation or repair."""
 
     schema = json.dumps(persona_array_schema(), ensure_ascii=False, separators=(",", ":"))
-    return ["--json-schema", schema, "--tools", ""]
-
-
-def refused_persona_argv(executable: str, prompt: str) -> list[str]:
-    """The persona argv this build does not execute."""
-
-    return [executable, "-p", prompt, *persona_cli_extra_args()]
+    return [
+        "--max-turns",
+        "1",
+        "--json-schema",
+        schema,
+        "--disallowed-tools",
+        "run_terminal_cmd,run_terminal_command",
+        "--no-subagents",
+        "--disable-web-search",
+        "--no-plan",
+        "--no-memory",
+    ]
 
 
 def fit_code_points(text: str, low: int, high: int) -> str:
@@ -567,12 +560,6 @@ def _call_once(run_id, *, role, logical_batch, messages, kind, clock, on_step=No
     if on_step is not None:
         on_step()
     logger.info("tweet loop call role=%s batch=%s kind=%s", role, logical_batch, kind)
-    if role == "persona" and not PERSONA_TOOLSET_EMPTY:
-        # Generation and its repair both stop here. Report and wave calls do not.
-        return _reject(
-            PERSONA_NOT_STARTED,
-            "人设调用的工具集合不能确认为空，这次没有启动。",
-        )
     return generate(
         run_id,
         role=role,
@@ -613,6 +600,10 @@ def _call_with_one_repair(run_id, *, role, logical_batch, messages, clock, accep
     locked, errors = accept(first.text)
     attempts = 1
     send_repair = bool(errors) and first.status == "completed"
+    # A reply that locks nothing is unusable prose. Do not send it again.
+    # A partial lock still repairs when the time budget allows.
+    if send_repair and role == "persona" and not locked:
+        send_repair = False
     if send_repair and allow_repair is not None:
         send_repair = bool(allow_repair())
     if send_repair:
