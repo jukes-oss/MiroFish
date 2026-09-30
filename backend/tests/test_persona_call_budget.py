@@ -34,6 +34,7 @@ from app.tweet.loop import (
     persona_array_schema,
     persona_call_seconds,
     persona_cli_extra_args,
+    persona_cli_schema,
     persona_groups,
     persona_repair_fits,
 )
@@ -502,8 +503,18 @@ def _assert_started_persona_command(argv):
     assert argv[1] == "-p"
     assert '"task":"persona_batch"' in argv[2]
     assert argv[3:] == persona_cli_extra_args()
-    schema = json.loads(argv[argv.index("--json-schema") + 1])
-    assert schema == persona_array_schema()
+    raw_schema = argv[argv.index("--json-schema") + 1]
+    assert "pattern" not in raw_schema
+    schema = json.loads(raw_schema)
+    assert schema == persona_cli_schema()
+    handed_name = schema["items"]["properties"]["display_name"]
+    assert "pattern" not in handed_name
+    assert handed_name["minLength"] == 3
+    assert handed_name["maxLength"] == 30
+    local_name = persona_array_schema()["items"]["properties"]["display_name"]
+    assert local_name["pattern"] == "^虚构"
+    assert local_name["minLength"] == 3
+    assert local_name["maxLength"] == 30
     assert schema["type"] == "array"
     assert set(schema["items"]["properties"]) == {
         "agent_id",

@@ -7,6 +7,7 @@ it does not send one request per account. The worker enters this loop from
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -110,10 +111,28 @@ def persona_array_schema() -> dict:
     return schema
 
 
+def persona_cli_schema() -> dict:
+    """Personas array for ``--json-schema``.
+
+    The local file still requires ``^虚构``. That pattern's shortest match is
+    the two characters 虚构, so it is not handed to the model. minLength and
+    maxLength stay.
+    """
+
+    schema = copy.deepcopy(persona_array_schema())
+    name = schema["items"]["properties"]["display_name"]
+    name.pop("pattern", None)
+    description = name.get("description")
+    if isinstance(description, str):
+        description = description.replace("pattern 只检查前缀，不是字段的值。", "").strip()
+        name["description"] = description
+    return schema
+
+
 def persona_cli_extra_args() -> list[str]:
     """Flags after ``-p`` and the prompt for a tweet persona generation or repair."""
 
-    schema = json.dumps(persona_array_schema(), ensure_ascii=False, separators=(",", ":"))
+    schema = json.dumps(persona_cli_schema(), ensure_ascii=False, separators=(",", ":"))
     return [
         "--max-turns",
         "1",
