@@ -409,10 +409,15 @@ def test_explanatory_prose_does_not_become_a_persona():
     assert "不追求正好 60" in contract
     assert "写满即停" not in contract
     assert name_rule == (
-        "display_name 必须以「虚构」开头，再加至少一个字，"
-        "整个名字 3 到 30 个码点，同一批里不要重名。"
-        "例如「虚构甲」。不要只写「虚构」两个字。"
+        "想好的全名必须原样写进 JSON 的 display_name，不能只写前缀。"
+        "错的是\"虚构\"，对的是\"虚构甲\"。"
+        "对的名字至少 3 个码点，以虚构开头，同一批里不要重名。"
     )
+    assert "再加至少一个字" not in name_rule
+    assert "例如「虚构甲」" not in name_rule
+    shape = payload["output_contract"]["shape"]
+    assert "不要说明" not in shape
+    assert "输入已完整，只依据 slots，直接返回裸 JSON 数组。" in shape
     encoded = json.dumps(payload, ensure_ascii=False)
     assert "输入已完整，只依据 slots，直接返回裸 JSON 数组。" in encoded
     assert "不查文件、不跑脚本、不写准备说明。" in encoded
@@ -631,6 +636,9 @@ def test_two_character_name_stays_schema_failure(tmp_path, monkeypatch):
         assert name_rule["minLength"] == 3
         assert name_rule["pattern"] == "^虚构"
         assert name_rule["maxLength"] == 30
+        assert "不能只写前缀" in name_rule["description"]
+        assert '错的是"虚构"' in name_rule["description"]
+        assert '对的是"虚构甲"' in name_rule["description"]
         _, validators = load_schemas()
         detail = schema_errors(validators["persona_batch"], {
             "schema_version": "2.0",
@@ -678,7 +686,10 @@ def test_two_character_name_stays_schema_failure(tmp_path, monkeypatch):
             assert "短句模板" in item["persona"]
         _assert_one_persona_start(log_path, count_path, run_id)
         prompt = _logged_argv(log_path)[0][0][2]
-        assert "不要只写「虚构」两个字" in prompt
+        assert "想好的全名必须原样写进 JSON 的 display_name，不能只写前缀。" in prompt
+        assert "错的是\\\"虚构\\\"，对的是\\\"虚构甲\\\"。" in prompt
+        assert "再加至少一个字" not in prompt
+        assert "不要说明" not in prompt
     finally:
         env["server"].shutdown()
 

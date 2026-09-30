@@ -23,6 +23,7 @@
           },
           "display_name": {
             "type": "string",
+            "description": "想好的全名原样写在这个字段，不能只写前缀。错的是\"虚构\"，对的是\"虚构甲\"。至少 3 个码点，以虚构开头，同一批不重名。pattern 只检查前缀，不是字段的值。",
             "pattern": "^虚构",
             "minLength": 3,
             "maxLength": 30

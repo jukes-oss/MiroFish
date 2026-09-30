@@ -182,13 +182,13 @@ def build_persona_payload(slots: list[dict], *, audience_version: str, seed: int
             "schema_version": "2.0",
             "shape": (
                 "输入已完整，只依据 slots，直接返回裸 JSON 数组。"
-                "不要 markdown，不要说明，字符串不要换行。"
+                "不要 markdown，字符串不要换行。"
                 "不查文件、不跑脚本、不写准备说明。"
             ),
             "display_name": (
-                "display_name 必须以「虚构」开头，再加至少一个字，"
-                "整个名字 3 到 30 个码点，同一批里不要重名。"
-                "例如「虚构甲」。不要只写「虚构」两个字。"
+                "想好的全名必须原样写进 JSON 的 display_name，不能只写前缀。"
+                "错的是\"虚构\"，对的是\"虚构甲\"。"
+                "对的名字至少 3 个码点，以虚构开头，同一批里不要重名。"
             ),
             "bio": "不超过 16 个码点。",
             "persona": "60 到 120 个码点，不追求正好 60。",
