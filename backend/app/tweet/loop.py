@@ -39,6 +39,32 @@ PUBLIC_KINDS = {"reply": "reply", "quote": "quote", "repost": "repost"}
 # asks for at most one third of that batch.
 FAILED_SINGLE_CALL_SLOTS = 12
 PERSONA_CALL_MAX_SLOTS = FAILED_SINGLE_CALL_SLOTS // 3
+# Headless flags for the tweet persona call only. They remove tools and stop
+# after one turn. --deny would leave the shell available and cancel the turn.
+# --tools is an allowlist and is not used.
+PERSONA_TEXT_ONLY_ARGS = [
+    "--max-turns",
+    "1",
+    "--no-subagents",
+    "--disable-web-search",
+    "--no-plan",
+    "--no-memory",
+    "--disallowed-tools",
+    ",".join([
+        "run_terminal_cmd",
+        "run_terminal_command",
+        "read_file",
+        "grep",
+        "list_dir",
+        "search_replace",
+        "write",
+        "web_search",
+        "web_fetch",
+        "todo_write",
+        "task",
+        "Agent",
+    ]),
+]
 _VALIDATORS = None
 
 
@@ -149,7 +175,7 @@ def build_persona_payload(slots: list[dict], *, audience_version: str, seed: int
             "shape": "只返回一个 JSON 数组，每项一个人。不要 markdown，不要说明，字符串不要换行。",
             "display_name": "以虚构开头，不超过 12 个码点。",
             "bio": "不超过 16 个码点。",
-            "persona": "60 个码点，写满即停，不要写到 120。",
+            "persona": "60 到 120 个码点。",
             "avoid_speaking_when": "不超过 16 个码点。",
         },
     }
@@ -529,6 +555,7 @@ def _call_once(run_id, *, role, logical_batch, messages, kind, clock, on_step=No
         messages=messages,
         kind=kind,
         clock=clock,
+        cli_extra_args=PERSONA_TEXT_ONLY_ARGS if role == "persona" else None,
     )
 
 

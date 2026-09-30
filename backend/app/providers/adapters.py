@@ -85,12 +85,16 @@ def invoke_subscription_cli(
     cancel_check,
     register_process,
     max_output_bytes: int = MAX_OUTPUT_BYTES,
+    extra_args: list[str] | None = None,
 ) -> AdapterOutcome:
-    """Start a fixed executable with argv data. Do not use a shell."""
+    """Start a fixed executable with argv data. Do not use a shell.
+
+    Extra flags go after the prompt so argv[2] stays the prompt text.
+    """
 
     try:
         process = subprocess.Popen(
-            [executable, "-p", prompt],
+            [executable, "-p", prompt, *(extra_args or [])],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

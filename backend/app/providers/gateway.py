@@ -243,6 +243,7 @@ def generate(
     clock=None,
     timeout_seconds: float | None = None,
     max_output_bytes: int | None = None,
+    cli_extra_args: list[str] | None = None,
 ) -> GenerateResult:
     if role in RULE_ROLES:
         return _reject("rules_only", "主持人是规则角色，不会调用模型。")
@@ -263,6 +264,7 @@ def generate(
             clock=clock,
             timeout_seconds=timeout_seconds,
             max_output_bytes=max_output_bytes or MAX_OUTPUT_BYTES,
+            cli_extra_args=cli_extra_args,
         )
     finally:
         reset_sensitive(token)
@@ -278,6 +280,7 @@ def _generate(
     clock,
     timeout_seconds: float | None,
     max_output_bytes: int,
+    cli_extra_args: list[str] | None = None,
 ) -> GenerateResult:
     prepared = prepare_run(run_id, clock=clock)
     if not prepared.get("prepared"):
@@ -448,6 +451,7 @@ def _generate(
                     cancel_check=cancel_check,
                     register_process=register_process,
                     max_output_bytes=max_output_bytes,
+                    extra_args=cli_extra_args,
                 )
             elif adapter_name == "ollama":
                 outcome = invoke_ollama(

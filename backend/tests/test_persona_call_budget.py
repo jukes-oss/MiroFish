@@ -35,7 +35,7 @@ from app.tweet.loop import (
     persona_repair_fits,
 )
 from app.tweet.model_json import parse_model_object
-from test_m3_tweet_loop import REPLY_TEXT, Clock, _actions, _app, _create, _ready, _sent
+from test_m3_tweet_loop import FAKE_CLI, REPLY_TEXT, Clock, _actions, _app, _create, _ready, _sent
 
 import app.providers.gateway as gateway
 
@@ -386,5 +386,104 @@ def test_persona_repair_timeout_does_not_drop_the_wave(tmp_path, monkeypatch):
         assert {row["status"] for row in rows} == {"completed"}
         assert stored["fallback_ids"] == [slot["agent_id"] for slot in slots]
         assert all(item["persona_source"] == "persona_fallback" for item in stored["personas"])
+    finally:
+        env["server"].shutdown()
+
+
+def test_explanatory_prose_does_not_become_a_persona():
+    slots = [{"agent_id": f"a00{index}"} for index in range(1, 5)]
+    notes = [
+        "先看项目里 persona 批次的字段约定，再按码点限制生成。码点要卡死，我先用脚本把每条人设数到正好 60。",
+        "我先核对这个人设批次的输出字段和字数约束，再按每个槽位生成。字数按码点卡死，我先把四条人设量准再输出。",
+        "我先核对这个人设批次的字段和字数约束，再按契约只返回 JSON 数组。",
+    ]
+    for note in notes:
+        locked, errors = interpret_personas(note, slots)
+        assert locked == {}
+        assert [item["codes"] for item in errors] == [["json"], ["json"], ["json"], ["json"]]
+    payload = build_persona_payload(build_slots(4, seed=1), audience_version="zh_x_v1", seed=1)
+    contract = payload["output_contract"]["persona"]
+    assert contract.startswith("60")
+    assert "120" in contract
+    assert "写满即停" not in contract
+    assert "脚本" not in json.dumps(payload, ensure_ascii=False)
+
+
+def test_persona_call_argv_removes_the_terminal(tmp_path, monkeypatch):
+    """The stand-in records argv. This does not call Grok or Ollama."""
+
+    env = _ready(tmp_path, monkeypatch)
+    log_path = tmp_path / "argv.jsonl"
+    env["grok"].write_text(
+        FAKE_CLI.replace(
+            'prompt = sys.argv[2] if len(sys.argv) > 2 else ""',
+            "\n".join([
+                'with open(os.environ["ARGV_LOG"], "a", encoding="utf-8") as handle:',
+                '    handle.write(json.dumps(sys.argv, ensure_ascii=False) + "\\n")',
+                'prompt = sys.argv[2] if len(sys.argv) > 2 else ""',
+            ]),
+            1,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ARGV_LOG", str(log_path))
+    try:
+        client = _app().test_client()
+        run_id = _create(
+            client,
+            key="persona-text-only",
+            agent_count=2,
+            round_count=1,
+            draft=DRAFT,
+            author_context=AUTHOR,
+        )
+        slots = build_slots(2, seed=4)
+        summary = execute_loop(
+            run_id,
+            seed=4,
+            clock=Clock(),
+            candidates={slot["agent_id"]: "none" for slot in slots},
+        )
+        assert summary["persona"]["fallback"] is False
+        assert summary["waves_skipped"] == []
+        rows = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+        persona = [row for row in rows if '"task":"persona_batch"' in row[2]]
+        report = [row for row in rows if '"task":"report_stats"' in row[2]]
+        assert len(persona) == 1
+        assert len(report) == 1
+        argv = persona[0]
+        assert argv[1] == "-p"
+        assert '"task":"persona_batch"' in argv[2]
+        assert "写满即停" not in argv[2]
+        assert argv[3:] == [
+            "--max-turns",
+            "1",
+            "--no-subagents",
+            "--disable-web-search",
+            "--no-plan",
+            "--no-memory",
+            "--disallowed-tools",
+            ",".join([
+                "run_terminal_cmd",
+                "run_terminal_command",
+                "read_file",
+                "grep",
+                "list_dir",
+                "search_replace",
+                "write",
+                "web_search",
+                "web_fetch",
+                "todo_write",
+                "task",
+                "Agent",
+            ]),
+        ]
+        denied = set(argv[argv.index("--disallowed-tools") + 1].split(","))
+        assert {"run_terminal_cmd", "run_terminal_command", "read_file", "grep", "list_dir"} <= denied
+        assert "--tools" not in argv
+        assert "--deny" not in argv
+        assert "--always-approve" not in argv
+        assert report[0][1] == "-p"
+        assert len(report[0]) == 3
     finally:
         env["server"].shutdown()
