@@ -1,0 +1,120 @@
+{
+  "schema_version": "2.0",
+  "run_id": "synthetic_all_scroll",
+  "status": "complete",
+  "scope": {
+    "kind": "simulation_only",
+    "audience_version": "zh_x_v1",
+    "behavior_prior_version": "silent_v1",
+    "seed": 42,
+    "planned_rounds": 3,
+    "completed_rounds": 3,
+    "calibrated": false,
+    "evidence_truncated": false
+  },
+  "metrics": {
+    "planned_agents": 120,
+    "exposed_agents": 120,
+    "evaluated_agents": 120,
+    "missing_agents": 0,
+    "action_counts": {
+      "none": 120,
+      "like": 0,
+      "reply": 0,
+      "repost": 0,
+      "quote": 0
+    },
+    "root_engaged_agents": 0,
+    "none_rate": 1,
+    "engagement_rate": 0
+  },
+  "usage": {
+    "execution_profile": "mixed",
+    "request_limit": 10,
+    "physical_requests": 5,
+    "reserved_requests": 0,
+    "uncertain_requests": 0,
+    "wall_limit_seconds": 600,
+    "wall_elapsed_ms": 120000,
+    "channels": [
+      {
+        "channel": "grok_cli",
+        "model_id": "grok-4.7",
+        "model_id_status": "configured_only",
+        "roles": [
+          "persona",
+          "report"
+        ],
+        "requests": 2,
+        "elapsed_ms": 40000
+      },
+      {
+        "channel": "ollama",
+        "model_id": "qwen3.8:27b-mxfp8",
+        "model_id_status": "configured_only",
+        "roles": [
+          "agent"
+        ],
+        "requests": 3,
+        "elapsed_ms": 80000
+      }
+    ]
+  },
+  "engagement": {
+    "tier": "low",
+    "tier_reason": "120次有效曝光全部划走，没有原帖互动。",
+    "rate_interval": {
+      "lower": 0,
+      "upper": 0
+    },
+    "meaning": "仅描述当前模拟样本的互动，不预测真实浏览量或点赞数。"
+  },
+  "trigger_lines": [],
+  "top_replies": [],
+  "backlash_risk": {
+    "level": "low",
+    "rule_version": "risk_rules_v1",
+    "issues": [],
+    "limitations": [
+      "没有观察到负面发言，不代表真实发布没有风险。"
+    ]
+  },
+  "disagreement": {
+    "views": [],
+    "silent_agents_are_not_supporters": true,
+    "note": "未产生公开观点，无法从沉默判断立场。"
+  },
+  "rewrites": [
+    {
+      "variant": "preserve_claim",
+      "text": "我想尝试用AI辅助写作。",
+      "what_changed": "保留使用AI写作的主张，改为个人计划。",
+      "changed_spans": [
+        {
+          "start": 0,
+          "end": 3,
+          "text": "所有人"
+        }
+      ],
+      "expected_effect": {
+        "hypothesis": "可能减少读者被要求接受统一标准的感觉。",
+        "tradeoff": "语气更弱，也可能减少讨论。",
+        "simulation_verified": false
+      }
+    }
+  ],
+  "confidence": {
+    "level": "low",
+    "calibration_status": "uncalibrated",
+    "basis": "合成契约示例，未经历史结果校准。",
+    "uncertainties": [
+      "受众比例是工程假设。",
+      "真实推荐算法和发布环境未知。",
+      "120个虚构账号不能代表中文X总体。"
+    ]
+  },
+  "limitations": [
+    "此例是合成测试，不是历史推文结果。"
+  ],
+  "degradation_reasons": []
+}

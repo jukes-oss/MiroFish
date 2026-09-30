@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mirofish:tweet:persona-batch:v2",
+  "title": "persona-batch",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "personas": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 240,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "display_name": {
+            "type": "string",
+            "description": "想好的全名原样写在这个字段，不能只写前缀。错的是\"虚构\"，对的是\"虚构甲\"。至少 3 个码点，以虚构开头，同一批不重名。pattern 只检查前缀，不是字段的值。",
+            "pattern": "^虚构",
+            "minLength": 3,
+            "maxLength": 30
+          },
+          "bio": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "persona": {
+            "type": "string",
+            "minLength": 60,
+            "maxLength": 120
+          },
+          "avoid_speaking_when": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          }
+        },
+        "required": [
+          "agent_id",
+          "display_name",
+          "bio",
+          "persona",
+          "avoid_speaking_when"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "personas"
+  ]
+}

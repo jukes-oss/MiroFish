@@ -12,7 +12,6 @@ import time
 import json
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
-from zep_cloud import NotFoundError
 
 from ..config import Config
 from ..utils.logger import get_logger
@@ -720,7 +719,8 @@ class ZepToolsService:
             节点信息或None
         """
         logger.info(t("console.fetchingNodeDetail", uuid=node_uuid[:8]))
-        
+        from zep_cloud import NotFoundError
+
         try:
             node = self._call_with_retry(
                 func=lambda: self.client.graph.node.get(uuid_=node_uuid),

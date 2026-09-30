@@ -5,7 +5,6 @@ Zep实体读取与过滤服务
 
 from typing import Dict, Any, List, Optional, Set, Callable, TypeVar
 from dataclasses import dataclass, field
-from zep_cloud import NotFoundError
 
 from ..config import Config
 from ..utils.logger import get_logger
@@ -351,6 +350,8 @@ class ZepEntityReader:
         Returns:
             EntityNode或None
         """
+        from zep_cloud import NotFoundError
+
         try:
             # 使用重试机制获取节点
             node = self._call_with_retry(

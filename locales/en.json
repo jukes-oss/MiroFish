@@ -69,7 +69,19 @@
     "promptPlaceholder": "// Describe your simulation or prediction requirement in natural language",
     "engineBadge": "Engine: MiroFish-V1.0",
     "startEngine": "Start Engine",
-    "initializing": "Initializing..."
+    "initializing": "Initializing...",
+    "genericUnavailable": "The local graph for general mode is not ready. This mode is unavailable and will not fall back to the cloud.",
+    "tweetTitle": "Tweet preview",
+    "tweetHint": "Opening the page and viewing history does not need a model channel.",
+    "tweetDraft": "Draft",
+    "tweetDraftPlaceholder": "Paste a draft",
+    "tweetAuthor": "Author context",
+    "tweetAuthorPlaceholder": "Optional",
+    "tweetAudience": "Audience",
+    "tweetStart": "Save and check",
+    "tweetHistory": "Tweet runs",
+    "tweetHistoryEmpty": "No tweet runs yet.",
+    "tweetHistoryError": "History is temporarily unavailable."
   },
   "main": {
     "layoutGraph": "Graph",

@@ -9,7 +9,6 @@ import traceback
 import threading
 from contextlib import ExitStack, nullcontext
 from flask import request, jsonify
-from zep_cloud import NotFoundError
 
 from . import graph_bp
 from ..config import Config
@@ -26,6 +25,8 @@ from ..services.simulation_manager import SimulationManager
 from ..services.simulation_runner import SimulationRunner, RunnerStatus
 from ..services.zep_graph_memory_updater import ZepGraphMemoryManager
 from ..utils.llm_client import LLMResponseError
+from ..memory.pipeline import execute_local_build
+from ..memory.store import MemoryStore
 
 # 获取日志器
 logger = get_logger('mirofish.api')
@@ -88,7 +89,13 @@ def _delete_cloud_graph_if_present(graph_id: str | None) -> None:
                 f"Graph {graph_id} is in use by active consumer(s): "
                 f"{', '.join(active_simulations)}"
             )
+        local = MemoryStore()
+        if local.has_graph(graph_id):
+            local.delete_graph(graph_id)
+            return
         try:
+            from zep_cloud import NotFoundError
+
             GraphBuilderService(api_key=Config.ZEP_API_KEY).delete_graph(graph_id)
         except NotFoundError:
             logger.info("Zep Cloud graph already absent: %s", graph_id)
@@ -457,6 +464,113 @@ def build_graph():
         return _build_graph_impl()
 
 
+def _build_local_graph_impl(project, data):
+    """Build a new project's graph in SQLite. Do not call Zep or migrate cloud graphs."""
+
+    from ..tweet.channels import channel_error_message, channel_problems
+
+    problems = channel_problems()
+    if problems:
+        return jsonify({"success": False, "error": channel_error_message(problems)}), 400
+    if project.status == ProjectStatus.CREATED or not project.ontology:
+        return jsonify({"success": False, "error": t('api.ontologyNotGenerated')}), 400
+    force = data.get("force", False)
+    if not isinstance(force, bool):
+        return jsonify({"success": False, "error": "force must be a JSON boolean"}), 400
+    if project.status == ProjectStatus.GRAPH_COMPLETED and not force:
+        return jsonify({
+            "success": True,
+            "data": {
+                "project_id": project.project_id,
+                "task_id": project.graph_build_task_id,
+                "graph_id": project.graph_id,
+                "reused": True,
+                "memory_backend": "local",
+                "message": t('progress.graphBuildComplete'),
+            },
+        })
+    chunk_size = data.get("chunk_size", project.chunk_size or Config.DEFAULT_CHUNK_SIZE)
+    chunk_overlap = data.get("chunk_overlap", project.chunk_overlap or Config.DEFAULT_CHUNK_OVERLAP)
+    if not isinstance(chunk_size, int) or chunk_size <= 0:
+        return jsonify({"success": False, "error": "chunk_size must be a positive integer"}), 400
+    if not isinstance(chunk_overlap, int) or chunk_overlap < 0 or chunk_overlap >= chunk_size:
+        return jsonify({
+            "success": False,
+            "error": "chunk_overlap must satisfy 0 <= chunk_overlap < chunk_size",
+        }), 400
+    text = ProjectManager.get_extracted_text(project.project_id)
+    if not text:
+        return jsonify({"success": False, "error": t('api.textNotFound')}), 400
+    if force and project.graph_id:
+        MemoryStore().delete_graph(project.graph_id)
+        _clear_project_graph_reference(project)
+    graph_name = data.get("graph_name", project.name or "本地图谱")
+    project.chunk_size = chunk_size
+    project.chunk_overlap = chunk_overlap
+    task_manager = TaskManager()
+    task_id = task_manager.create_task(f"构建本地图谱: {graph_name}")
+    project.status = ProjectStatus.GRAPH_BUILDING
+    project.graph_build_task_id = task_id
+    ProjectManager.save_project(project)
+    current_locale = get_locale()
+    ontology = project.ontology
+    project_id = project.project_id
+
+    def build_task():
+        set_locale(current_locale)
+        try:
+            view = execute_local_build(
+                graph_name=graph_name,
+                project_id=project_id,
+                text=text,
+                ontology=ontology,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+            )
+            with _project_build_lock(project_id):
+                project.graph_id = view["graph_id"]
+                project.status = ProjectStatus.GRAPH_COMPLETED
+                project.error = None
+                project.memory_backend = "local"
+                ProjectManager.save_project(project)
+                task_manager.update_task(
+                    task_id,
+                    status=TaskStatus.COMPLETED,
+                    message=t('progress.graphBuildComplete'),
+                    progress=100,
+                    result={
+                        "project_id": project_id,
+                        "graph_id": view["graph_id"],
+                        "node_count": view["node_count"],
+                        "edge_count": view["edge_count"],
+                        "memory_backend": "local",
+                        "extraction": view.get("extraction"),
+                    },
+                )
+        except Exception as error:
+            with _project_build_lock(project_id):
+                project.status = ProjectStatus.FAILED
+                project.error = str(error)
+                ProjectManager.save_project(project)
+                task_manager.update_task(
+                    task_id,
+                    status=TaskStatus.FAILED,
+                    message=t('progress.buildFailed', error=str(error)),
+                    error=traceback.format_exc(),
+                )
+
+    threading.Thread(target=build_task, daemon=True).start()
+    return jsonify({
+        "success": True,
+        "data": {
+            "project_id": project_id,
+            "task_id": task_id,
+            "memory_backend": "local",
+            "message": t('api.graphBuildStarted', taskId=task_id),
+        },
+    })
+
+
 def _build_graph_impl():
     """
     接口2：根据project_id构建图谱
@@ -481,7 +595,11 @@ def _build_graph_impl():
     """
     try:
         logger.info("=== 开始构建图谱 ===")
-        
+        early = request.get_json(silent=True) or {}
+        early_project = ProjectManager.get_project(early.get("project_id")) if early.get("project_id") else None
+        if early_project is not None and early_project.memory_backend == "local":
+            return _build_local_graph_impl(early_project, early)
+
         # 检查配置
         errors = []
         if not Config.ZEP_API_KEY:
@@ -882,6 +1000,12 @@ def get_graph_data(graph_id: str):
     获取图谱数据（节点和边）
     """
     try:
+        local = MemoryStore()
+        if local.has_graph(graph_id):
+            return jsonify({
+                "success": True,
+                "data": local.graph_view(graph_id),
+            })
         if not Config.ZEP_API_KEY:
             return jsonify({
                 "success": False,
@@ -910,7 +1034,8 @@ def delete_graph(graph_id: str):
     删除Zep图谱
     """
     try:
-        if not Config.ZEP_API_KEY:
+        local = MemoryStore()
+        if not local.has_graph(graph_id) and not Config.ZEP_API_KEY:
             return jsonify({
                 "success": False,
                 "error": t('api.zepApiKeyMissing')

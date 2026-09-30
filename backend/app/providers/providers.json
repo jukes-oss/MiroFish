@@ -1,0 +1,59 @@
+{
+  "schema_version": "2.0",
+  "channels": ["subscription_cli", "ollama"],
+  "limits": {
+    "run_max_requests": 10,
+    "run_max_wall_seconds": 600,
+    "request_timeout_seconds": 120,
+    "llm_concurrency": 1,
+    "day_max_requests": 50,
+    "max_attempts_per_batch": 2,
+    "report_reserve_calls": 2,
+    "report_reserve_wall_seconds": 240
+  },
+  "models": {
+    "grok": {
+      "model_id": "grok-4.7",
+      "model_id_status": "configured_only",
+      "verification": "待验"
+    },
+    "codex": {
+      "model_id": null,
+      "model_id_status": "unknown",
+      "verification": "待验"
+    },
+    "ollama": {
+      "model_id": "qwen3.8:27b-mxfp8",
+      "model_id_status": "configured_only",
+      "verification": "待验"
+    }
+  },
+  "routes": {
+    "mixed": {
+      "persona": "subscription_cli",
+      "agent": "ollama",
+      "report": "subscription_cli",
+      "ontology": "ollama",
+      "extractor": "ollama",
+      "config": "ollama",
+      "interview": "ollama"
+    },
+    "subscription-only": {
+      "persona": "subscription_cli",
+      "agent": "subscription_cli",
+      "report": "subscription_cli",
+      "ontology": "ollama",
+      "extractor": "ollama",
+      "config": "ollama",
+      "interview": "ollama"
+    }
+  },
+  "moderator": "rules",
+  "silent_fallback": false,
+  "unverified": {
+    "login": "待验",
+    "model_id": "待验",
+    "headless_invocation": "待验",
+    "ollama_address": "待验"
+  }
+}

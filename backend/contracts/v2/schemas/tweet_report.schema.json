@@ -1,0 +1,959 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mirofish:tweet:report:v2",
+  "title": "report",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "degraded",
+        "failed"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "simulation_only"
+        },
+        "audience_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "behavior_prior_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "planned_rounds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "completed_rounds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "calibrated": {
+          "type": "boolean"
+        },
+        "evidence_truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "audience_version",
+        "behavior_prior_version",
+        "seed",
+        "planned_rounds",
+        "completed_rounds",
+        "calibrated",
+        "evidence_truncated"
+      ]
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "planned_agents": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 240
+        },
+        "exposed_agents": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 240
+        },
+        "evaluated_agents": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 240
+        },
+        "missing_agents": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 240
+        },
+        "action_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "none": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 240
+            },
+            "like": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 240
+            },
+            "reply": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 240
+            },
+            "repost": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 240
+            },
+            "quote": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 240
+            }
+          },
+          "required": [
+            "none",
+            "like",
+            "reply",
+            "repost",
+            "quote"
+          ]
+        },
+        "root_engaged_agents": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 240
+        },
+        "none_rate": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "engagement_rate": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "planned_agents",
+        "exposed_agents",
+        "evaluated_agents",
+        "missing_agents",
+        "action_counts",
+        "root_engaged_agents",
+        "none_rate",
+        "engagement_rate"
+      ]
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "execution_profile": {
+          "type": "string",
+          "enum": [
+            "mixed",
+            "subscription-only"
+          ]
+        },
+        "request_limit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "physical_requests": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reserved_requests": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "uncertain_requests": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wall_limit_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "wall_elapsed_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "channel": {
+                "type": "string",
+                "enum": [
+                  "grok_cli",
+                  "codex_cli",
+                  "ollama"
+                ]
+              },
+              "model_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "model_id_status": {
+                "type": "string",
+                "enum": [
+                  "reported",
+                  "configured_only",
+                  "unknown"
+                ]
+              },
+              "roles": {
+                "type": "array",
+                "uniqueItems": true,
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "persona",
+                    "agent",
+                    "report",
+                    "ontology",
+                    "extractor",
+                    "config",
+                    "interview"
+                  ]
+                }
+              },
+              "requests": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "elapsed_ms": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "channel",
+              "model_id",
+              "model_id_status",
+              "roles",
+              "requests",
+              "elapsed_ms"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "model_id_status": {
+                      "const": "unknown"
+                    }
+                  },
+                  "required": [
+                    "model_id_status"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "model_id": {
+                      "type": "null"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "model_id_status": {
+                      "enum": [
+                        "reported",
+                        "configured_only"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "model_id_status"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "model_id": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "execution_profile",
+        "request_limit",
+        "physical_requests",
+        "reserved_requests",
+        "uncertain_requests",
+        "wall_limit_seconds",
+        "wall_elapsed_ms",
+        "channels"
+      ]
+    },
+    "engagement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tier": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "insufficient_data"
+          ]
+        },
+        "tier_reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "rate_interval": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "lower": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "upper": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "lower",
+                "upper"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "meaning": {
+          "const": "仅描述当前模拟样本的互动，不预测真实浏览量或点赞数。"
+        }
+      },
+      "required": [
+        "tier",
+        "tier_reason",
+        "rate_interval",
+        "meaning"
+      ]
+    },
+    "trigger_lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "span": {
+            "$ref": "#/$defs/span"
+          },
+          "triggered_groups": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "minItems": 1,
+            "maxItems": 12
+          },
+          "reaction_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "agreement",
+                "skepticism",
+                "offense",
+                "sarcasm",
+                "confusion",
+                "amplification"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 6
+          },
+          "explanation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "minItems": 1,
+            "maxItems": 240
+          }
+        },
+        "required": [
+          "span",
+          "triggered_groups",
+          "reaction_types",
+          "explanation",
+          "evidence_ids"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 8
+    },
+    "top_replies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140
+          },
+          "group_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "minItems": 1,
+            "maxItems": 12
+          },
+          "simulated_likes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 240
+          },
+          "shown_to": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 240
+          },
+          "rank_basis": {
+            "type": "string",
+            "enum": [
+              "simulated_like_rate",
+              "unvalidated_candidate"
+            ]
+          },
+          "why_it_might_resonate": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "limitation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "action_id",
+          "agent_id",
+          "text",
+          "group_ids",
+          "simulated_likes",
+          "shown_to",
+          "rank_basis",
+          "why_it_might_resonate",
+          "limitation"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 5
+    },
+    "backlash_risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "insufficient_data"
+          ]
+        },
+        "rule_version": {
+          "const": "risk_rules_v1"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "triggered_groups": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "minItems": 1,
+                "maxItems": 12
+              },
+              "trigger_spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/span"
+                },
+                "minItems": 1,
+                "maxItems": 5
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "minItems": 1,
+                "maxItems": 240
+              }
+            },
+            "required": [
+              "reason",
+              "triggered_groups",
+              "trigger_spans",
+              "evidence_ids"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 6
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "minItems": 1,
+          "maxItems": 10
+        }
+      },
+      "required": [
+        "level",
+        "rule_version",
+        "issues",
+        "limitations"
+      ]
+    },
+    "disagreement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "views": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "interpretation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "expressed_stance": {
+                "type": "string",
+                "enum": [
+                  "supportive",
+                  "opposing",
+                  "mixed",
+                  "neutral"
+                ]
+              },
+              "group_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "minItems": 1,
+                "maxItems": 12
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "minItems": 1,
+                "maxItems": 240
+              }
+            },
+            "required": [
+              "interpretation",
+              "expressed_stance",
+              "group_ids",
+              "evidence_ids"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 8
+        },
+        "silent_agents_are_not_supporters": {
+          "const": true
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        }
+      },
+      "required": [
+        "views",
+        "silent_agents_are_not_supporters",
+        "note"
+      ]
+    },
+    "rewrites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "variant": {
+            "type": "string",
+            "enum": [
+              "preserve_claim",
+              "add_boundaries",
+              "change_style"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "what_changed": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "changed_spans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/span"
+            },
+            "minItems": 1,
+            "maxItems": 8
+          },
+          "expected_effect": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "hypothesis": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "tradeoff": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "simulation_verified": {
+                "const": false
+              }
+            },
+            "required": [
+              "hypothesis",
+              "tradeoff",
+              "simulation_verified"
+            ]
+          }
+        },
+        "required": [
+          "variant",
+          "text",
+          "what_changed",
+          "changed_spans",
+          "expected_effect"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 3
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium"
+          ]
+        },
+        "calibration_status": {
+          "type": "string",
+          "enum": [
+            "uncalibrated",
+            "validated"
+          ]
+        },
+        "basis": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "uncertainties": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "minItems": 3,
+          "maxItems": 12
+        }
+      },
+      "required": [
+        "level",
+        "calibration_status",
+        "basis",
+        "uncertainties"
+      ]
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 400
+      },
+      "minItems": 1,
+      "maxItems": 12
+    },
+    "degradation_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300
+      },
+      "minItems": 0,
+      "maxItems": 12
+    }
+  },
+  "required": [
+    "schema_version",
+    "run_id",
+    "status",
+    "scope",
+    "metrics",
+    "usage",
+    "engagement",
+    "trigger_lines",
+    "top_replies",
+    "backlash_risk",
+    "disagreement",
+    "rewrites",
+    "confidence",
+    "limitations",
+    "degradation_reasons"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "complete"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "rewrites": {
+            "minItems": 2,
+            "maxItems": 3
+          },
+          "degradation_reasons": {
+            "maxItems": 0
+          },
+          "metrics": {
+            "properties": {
+              "missing_agents": {
+                "const": 0
+              }
+            }
+          },
+          "scope": {
+            "properties": {
+              "evidence_truncated": {
+                "const": false
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "degradation_reasons": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "confidence": {
+            "properties": {
+              "calibration_status": {
+                "const": "uncalibrated"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "confidence": {
+            "properties": {
+              "level": {
+                "const": "low"
+              }
+            }
+          },
+          "scope": {
+            "properties": {
+              "calibrated": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "engagement": {
+            "properties": {
+              "tier": {
+                "const": "insufficient_data"
+              }
+            }
+          },
+          "backlash_risk": {
+            "properties": {
+              "level": {
+                "const": "insufficient_data"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2000
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2000
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "text"
+      ]
+    }
+  }
+}

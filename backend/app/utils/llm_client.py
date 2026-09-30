@@ -7,9 +7,7 @@ import json
 import logging
 import re
 from typing import Optional, Dict, Any, List
-from openai import OpenAI
-
-from ..config import Config
+from ..providers.blocked import BlockedPaidClient, refuse_direct_model_call
 from .openai_chat_compat import create_chat_completion, extract_chat_completion_text
 
 
@@ -97,17 +95,15 @@ class LLMClient:
         base_url: Optional[str] = None,
         model: Optional[str] = None
     ):
-        self.api_key = api_key or Config.LLM_API_KEY
-        self.base_url = base_url or Config.LLM_BASE_URL
-        self.model = model or Config.LLM_MODEL_NAME
-        
-        if not self.api_key:
-            raise ValueError("LLM_API_KEY 未配置")
-        
-        self.client = OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
-        )
+        del api_key, base_url
+        self.api_key = None
+        self.base_url = None
+        self.model = model or ""
+        self.client = BlockedPaidClient()
+
+    def _refuse_paid_client(self) -> None:
+        if isinstance(getattr(self, "client", None), BlockedPaidClient):
+            refuse_direct_model_call("LLMClient")
 
     def _create_completion(
         self,
@@ -147,6 +143,7 @@ class LLMClient:
         Returns:
             模型响应文本
         """
+        self._refuse_paid_client()
         response = self._create_completion(
             messages=messages,
             temperature=temperature,
@@ -175,6 +172,7 @@ class LLMClient:
         Returns:
             解析后的JSON对象
         """
+        self._refuse_paid_client()
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least 1")
 

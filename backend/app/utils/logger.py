@@ -44,6 +44,8 @@ def setup_logger(name: str = 'mirofish', level: int = logging.DEBUG) -> logging.
     # 创建日志器
     logger = logging.getLogger(name)
     logger.setLevel(level)
+    from ..providers.redact import install_redaction
+    install_redaction(logger)
     
     # 阻止日志向上传播到根 logger，避免重复输出
     logger.propagate = False

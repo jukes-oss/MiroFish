@@ -53,6 +53,9 @@ class Project:
     
     # 错误信息
     error: Optional[str] = None
+
+    # 缺省保持 zep，避免把已有云端项目改判成本地。新项目在 create_project 里写成 local。
+    memory_backend: str = "zep"
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -73,7 +76,8 @@ class Project:
             "simulation_requirement": self.simulation_requirement,
             "chunk_size": self.chunk_size,
             "chunk_overlap": self.chunk_overlap,
-            "error": self.error
+            "error": self.error,
+            "memory_backend": self.memory_backend,
         }
     
     @classmethod
@@ -100,8 +104,24 @@ class Project:
             simulation_requirement=data.get('simulation_requirement'),
             chunk_size=data.get('chunk_size', 500),
             chunk_overlap=data.get('chunk_overlap', 50),
-            error=data.get('error')
+            error=data.get('error'),
+            memory_backend=_memory_backend(data.get('memory_backend')),
         )
+
+
+def _memory_backend(value: Any) -> str:
+    """Missing or unknown values stay on Zep. Do not migrate old project files."""
+
+    if value == "local":
+        return "local"
+    return "zep"
+
+
+def default_memory_backend() -> str:
+    selected = os.environ.get("MEMORY_BACKEND", "local").strip().lower()
+    if selected == "zep":
+        return "zep"
+    return "local"
 
 
 class ProjectManager:
@@ -156,7 +176,8 @@ class ProjectManager:
             name=name,
             status=ProjectStatus.CREATED,
             created_at=now,
-            updated_at=now
+            updated_at=now,
+            memory_backend=default_memory_backend(),
         )
         
         # 创建项目目录结构

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mirofish:tweet:action-batch-input:v2",
+  "title": "action-batch-input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "round": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4
+    },
+    "items": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 240,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "persona": {
+            "type": "string",
+            "minLength": 60,
+            "maxLength": 120
+          },
+          "candidate_action": {
+            "type": "string",
+            "enum": [
+              "like",
+              "reply",
+              "repost",
+              "quote"
+            ]
+          },
+          "visible_timeline": {
+            "type": "array",
+            "maxItems": 240,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "root_post",
+                    "reply",
+                    "quote",
+                    "repost"
+                  ]
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 0,
+                  "maxLength": 2000
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "text"
+              ]
+            }
+          },
+          "author_context": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          },
+          "draft_text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "agent_id",
+          "persona",
+          "candidate_action",
+          "visible_timeline",
+          "author_context",
+          "draft_text"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "round",
+    "items"
+  ]
+}

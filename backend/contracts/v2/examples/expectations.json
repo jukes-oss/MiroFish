@@ -1,0 +1,87 @@
+[
+  {
+    "file": "persona.valid.json",
+    "kind": "persona_batch",
+    "expect": "accept"
+  },
+  {
+    "file": "persona.invalid.json",
+    "kind": "persona_batch",
+    "expect": "reject"
+  },
+  {
+    "file": "action_batch.valid.json",
+    "kind": "action_batch",
+    "expect": "accept"
+  },
+  {
+    "file": "action_batch.malicious_ids.invalid.json",
+    "kind": "action_batch",
+    "expect": "reject"
+  },
+  {
+    "file": "action_batch.all_none.valid.json",
+    "kind": "action_batch",
+    "expect": "accept"
+  },
+  {
+    "file": "action_batch.empty_replies.valid.json",
+    "kind": "action_batch",
+    "expect": "accept"
+  },
+  {
+    "file": "action_batch.injection_ignored.valid.json",
+    "kind": "action_batch",
+    "expect": "accept"
+  },
+  {
+    "file": "action_batch.injection_obeyed.invalid.json",
+    "kind": "action_batch",
+    "expect": "reject"
+  },
+  {
+    "file": "action_batch.empty_wave.valid.json",
+    "kind": "action_batch",
+    "expect": "accept"
+  },
+  {
+    "file": "report.valid.json",
+    "kind": "report",
+    "expect": "accept"
+  },
+  {
+    "file": "report.empty_replies.valid.json",
+    "kind": "report",
+    "expect": "accept"
+  },
+  {
+    "file": "report.invalid.json",
+    "kind": "report",
+    "expect": "reject"
+  },
+  {
+    "file": "report.call_count_exhausted.invalid.json",
+    "kind": "report",
+    "expect": "reject"
+  },
+  {
+    "file": "report.wall_overrun.valid.json",
+    "kind": "report",
+    "expect": "accept"
+  },
+  {
+    "file": "report.one_rewrite.invalid.json",
+    "kind": "report",
+    "expect": "reject"
+  },
+  {
+    "file": "eval_manifest.valid.json",
+    "kind": "eval_manifest",
+    "expect": "accept"
+  },
+  {
+    "file": "eval_manifest.invalid.json",
+    "kind": "eval_manifest",
+    "expect": "reject"
+  }
+]

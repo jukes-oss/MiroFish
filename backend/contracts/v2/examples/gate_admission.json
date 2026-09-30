@@ -1,0 +1,26 @@
+{
+  "call_count_exhausted": {
+    "physical_requests": 10,
+    "reserved_requests": 0,
+    "additional_reserve": 1,
+    "request_limit": 10,
+    "now_monotonic_ms": 0,
+    "deadline_monotonic_ms": 600000
+  },
+  "wall_clock_exhausted": {
+    "physical_requests": 2,
+    "reserved_requests": 0,
+    "additional_reserve": 1,
+    "request_limit": 10,
+    "now_monotonic_ms": 600000,
+    "deadline_monotonic_ms": 600000
+  },
+  "within_limits": {
+    "physical_requests": 4,
+    "reserved_requests": 2,
+    "additional_reserve": 1,
+    "request_limit": 10,
+    "now_monotonic_ms": 1000,
+    "deadline_monotonic_ms": 600000
+  }
+}

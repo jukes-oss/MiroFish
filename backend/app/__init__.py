@@ -63,15 +63,32 @@ def create_app(config_class=Config):
         return response
     
     # 注册蓝图
-    from .api import graph_bp, simulation_bp, report_bp
+    from .api import graph_bp, simulation_bp, report_bp, tweet_bp
+    from .tweet.worker import recover_stale_leases, start_background_worker
+    from .tweet.db import init_db
+
     app.register_blueprint(graph_bp, url_prefix='/api/graph')
     app.register_blueprint(simulation_bp, url_prefix='/api/simulation')
     app.register_blueprint(report_bp, url_prefix='/api/report')
+    app.register_blueprint(tweet_bp, url_prefix='/api/tweet')
+    init_db()
+    recover_stale_leases()
+    start_background_worker()
     
-    # 健康检查
+    # 健康检查。打开界面和查看历史不要求模型通道或 Zep 密钥。
     @app.route('/health')
     def health():
-        return {'status': 'ok', 'service': 'MiroFish Backend'}
+        return {
+            'status': 'ok',
+            'service': 'MiroFish Backend',
+            'mode_default': os.environ.get('MODE_DEFAULT', 'tweet'),
+            'memory_backend': os.environ.get('MEMORY_BACKEND', 'local'),
+            'channels_required_to_browse': False,
+            'generic_mode': {
+                'available': False,
+                'reason': '通用本地图谱尚未完成，此模式不可用，不会改用云端图谱。',
+            },
+        }
     
     if should_log_startup:
         logger.info("MiroFish Backend 启动完成")
