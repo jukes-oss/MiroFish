@@ -30,6 +30,15 @@ RISK_RULE = "risk_rules_v1"
 REPAIR_MARKER = "MIROFISH_REPAIR"
 _CHANNELS = ("grok_cli", "codex_cli", "ollama")
 _VARIANTS = ("preserve_claim", "add_boundaries", "change_style")
+_REPORT_ENVELOPE_KEYS = (
+    "structured_output",
+    "arguments",
+    "output",
+    "text",
+    "content",
+    "result",
+    "message",
+)
 _VALIDATORS = None
 
 
@@ -48,8 +57,48 @@ def _dump(payload) -> str:
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def _parse_object(text: str | None) -> dict | None:
-    return parse_model_object(text)
+def parse_report_model(text: str | None) -> dict | None:
+    """Object passed to rewrite_problems.
+
+    A top-level rewrites array is used as-is, even when its length is not 2
+    or 3. rewrite_count still rejects that length. When the reply is only an
+    envelope, the array may sit in text, structured_output, or arguments.
+    """
+
+    parsed = parse_model_object(text)
+    if isinstance(parsed, dict) and isinstance(parsed.get("rewrites"), list):
+        return parsed
+    found = _envelope_report(parsed, 0) if isinstance(parsed, dict) else None
+    if found is not None:
+        return found
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _envelope_report(value, depth: int) -> dict | None:
+    if depth > 4:
+        return None
+    if isinstance(value, str):
+        loaded = parse_model_object(value)
+        if not isinstance(loaded, dict):
+            return None
+        return _envelope_report(loaded, depth + 1)
+    if isinstance(value, list):
+        for item in value:
+            found = _envelope_report(item, depth + 1)
+            if found is not None:
+                return found
+        return None
+    if not isinstance(value, dict):
+        return None
+    if isinstance(value.get("rewrites"), list):
+        return value
+    for key in _REPORT_ENVELOPE_KEYS:
+        if key not in value:
+            continue
+        found = _envelope_report(value.get(key), depth + 1)
+        if found is not None:
+            return found
+    return None
 
 
 def report_object_schema() -> dict:
@@ -687,9 +736,11 @@ def _report_prompt(run, evidence: dict) -> dict:
         "reply_ids": [item["action_id"] for item in evidence["top_replies"]],
         "instruction": (
             "整段回复就是一个 JSON 对象，不要先写一句中文。不要跑脚本数码点。"
-            "键只有 rewrites。不要输出 top_replies、trigger_lines、"
-            "disagreement、backlash_risk、evidence_ids，也不要输出第二个 JSON。"
-            "rewrites 为 2 到 3 条，variant 取 preserve_claim、add_boundaries、change_style 中互不相同的值。"
+            "这个对象只有键 rewrites。不要把 rewrites 放进别的字段，也不要再包一层。"
+            "不要输出 top_replies、trigger_lines、disagreement、backlash_risk、evidence_ids，"
+            "也不要输出第二个 JSON。"
+            "rewrites 必须是数组，长度只能是 2 或 3。"
+            "variant 取 preserve_claim、add_boundaries、change_style 中互不相同的值。"
             "每条含 variant、text、what_changed、changed_spans、expected_effect。"
             "text 必须和草稿不同，且不得包含“这是预测”。"
             "changed_spans 的 start、end、text 写在这个 JSON 里，text 等于草稿里从 start 到 end 的原文。"
@@ -743,7 +794,7 @@ def finalize_report(
         sent = bool(first.sent)
         error = None if first.sent else first.error_code
         if first.sent and first.status == "completed":
-            narrative = _parse_object(first.text)
+            narrative = parse_report_model(first.text)
             problems = rewrite_problems(narrative, evidence)
             if problems:
                 if on_step is not None:
@@ -760,7 +811,8 @@ def finalize_report(
                             "errors": problems,
                             "rule": (
                                 "整段回复就是要求的 JSON，不要先写一句中文。"
-                                "不要跑脚本数码点。不要编造证据编号，不要把引用写成回复。"
+                                "不要跑脚本数码点。rewrites 必须是数组，长度只能是 2 或 3。"
+                                "不要编造证据编号，不要把引用写成回复。"
                             ),
                         })},
                     ],
@@ -770,7 +822,7 @@ def finalize_report(
                 )
                 sent = sent or bool(second.sent)
                 if second.sent and second.status == "completed":
-                    repaired = _parse_object(second.text)
+                    repaired = parse_report_model(second.text)
                     repaired_problems = rewrite_problems(repaired, evidence)
                     if not repaired_problems:
                         narrative = repaired

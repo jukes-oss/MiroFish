@@ -285,6 +285,8 @@ def test_prompts_name_the_output_contract():
     assert "模拟备忘" in report["instruction"]
     assert "整段回复就是一个 JSON 对象，不要先写一句中文。" in report["instruction"]
     assert "不要跑脚本数码点" in report["instruction"]
+    assert "rewrites 必须是数组，长度只能是 2 或 3。" in report["instruction"]
+    assert "2 到 3" not in report["instruction"]
     assert "码点切片" not in report["instruction"]
     assert "先按" not in report["instruction"]
 

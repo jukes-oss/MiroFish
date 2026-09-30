@@ -1,6 +1,6 @@
 # 报告用量模板 v2
 
-报告正文仍使用固定证据字段。宿主在报告和修复结束之后写入最终 `usage`，再按 `schemas/tweet_report.schema.json` 重新校验。模型不计算调用次数、墙钟或通道统计。报告生成和报告修复的命令行是 `grok -p`、提示，然后 `--max-turns 1`、`--json-schema`（这份报告对象，不是人设数组）、`--disallowed-tools run_terminal_cmd,run_terminal_command`、`--no-subagents`、`--disable-web-search`、`--no-plan`、`--no-memory`。整段回复就是要求的 JSON，不要先写一句中文，也不要跑脚本数码点。
+报告正文仍使用固定证据字段。宿主在报告和修复结束之后写入最终 `usage`，再按 `schemas/tweet_report.schema.json` 重新校验。模型不计算调用次数、墙钟或通道统计。报告生成和报告修复的命令行是 `grok -p`、提示，然后 `--max-turns 1`、`--json-schema`（这份报告对象，不是人设数组）、`--disallowed-tools run_terminal_cmd,run_terminal_command`、`--no-subagents`、`--disable-web-search`、`--no-plan`、`--no-memory`。整段回复就是要求的 JSON，不要先写一句中文，也不要跑脚本数码点。rewrites 必须是数组，长度只能是 2 或 3。顶层没有这个数组时，从 text、structured_output、arguments 里取出，仍按 2 或 3 条校验；其他条数不收下，也不编造。
 
 `usage` 只含 `execution_profile`、`request_limit`、`physical_requests`、`reserved_requests`、`uncertain_requests`、`wall_limit_seconds`、`wall_elapsed_ms` 和 `channels`。没有美元、单价或计费 token 字段。`execution_profile` 为 `mixed` 或 `subscription-only`。通道只记录 `grok_cli`、`codex_cli`、`ollama`。
 

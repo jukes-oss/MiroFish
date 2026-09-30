@@ -20,6 +20,7 @@ from app.tweet.loop import execute_loop, persona_cli_schema
 from app.tweet.model_json import parse_model_object
 from app.tweet.report import (
     order_top_replies,
+    parse_report_model,
     report_cli_extra_args,
     report_object_schema,
     rewrite_problems,
@@ -49,6 +50,23 @@ def _valid_rewrites(draft: str) -> list[dict]:
         }
 
     return [one("preserve_claim", "个人觉得"), one("add_boundaries", "在一些情况下")]
+
+
+def _three_rewrites(draft: str) -> list[dict]:
+    items = _valid_rewrites(draft)
+    snippet = draft[0]
+    items.append({
+        "variant": "change_style",
+        "text": "换个说法" + draft,
+        "what_changed": "只改口气，原意还在。",
+        "changed_spans": [{"start": 0, "end": 1, "text": snippet}],
+        "expected_effect": {
+            "hypothesis": "可能让口气更像个人说法。",
+            "tradeoff": "号召感会变弱。",
+            "simulation_verified": False,
+        },
+    })
+    return items
 
 
 def _evidence(draft: str) -> dict:
@@ -414,6 +432,8 @@ def test_chinese_sentence_does_not_become_a_report(tmp_path, monkeypatch):
         assert "MIROFISH_REPAIR" in rows[1][2]
         assert "不要先写一句中文" in rows[0][2]
         assert "不要跑脚本数码点" in rows[0][2]
+        assert "长度只能是 2 或 3" in rows[0][2]
+        assert "长度只能是 2 或 3" in rows[1][2]
         assert "码点切片" not in rows[0][2]
         for row in rows:
             _assert_report_command(row)
@@ -447,5 +467,116 @@ def test_valid_report_json_is_kept_from_the_started_process(tmp_path, monkeypatc
         assert len(rows) == 1
         _assert_report_command(rows[0])
         assert "MIROFISH_REPAIR" not in rows[0][2]
+    finally:
+        env["server"].shutdown()
+
+
+def test_three_rewrites_are_legal_and_four_are_not():
+    """rewrite_count allows 2 or 3. A list of 3 is kept. A list of 4 is not."""
+
+    draft = DRAFT
+    three = {"rewrites": _three_rewrites(draft)}
+    four = {"rewrites": _three_rewrites(draft) + _three_rewrites(draft)[:1]}
+    evidence = {"draft": draft}
+    assert len(three["rewrites"]) == 3
+    assert len(four["rewrites"]) == 4
+    assert rewrite_problems(three, evidence) == []
+    assert rewrite_problems(four, evidence) == ["rewrite_count"]
+    assert rewrite_problems({"rewrites": three["rewrites"][:1]}, evidence) == ["rewrite_count"]
+
+
+def test_three_rewrite_json_is_kept_from_the_started_process(tmp_path, monkeypatch):
+    """A legal 3-rewrite object from the started process is kept. The command line stays."""
+
+    env = _ready(tmp_path, monkeypatch)
+    text = json.dumps({"rewrites": _three_rewrites(DRAFT)}, ensure_ascii=False)
+    log_path = _arm_report_stdout(env, tmp_path, monkeypatch, text, text)
+    try:
+        client = _app().test_client()
+        run_id = _create(client, key="report-three", agent_count=2, round_count=1)
+        seed_persona_cache(run_id, seed=11)
+        slots = build_slots(2, seed=11)
+        summary = execute_loop(
+            run_id,
+            seed=11,
+            clock=Clock(),
+            candidates={slot["agent_id"]: "none" for slot in slots},
+        )
+        assert summary["status"] == "complete"
+        assert summary["report_call"]["problems"] == []
+        document = client.get(f"/api/tweet/runs/{run_id}/report").json["report"]
+        assert check_report(document, VALIDATORS) == []
+        assert len(document["rewrites"]) == 3
+        assert _sent(run_id, "report") == 1
+        rows = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+        assert len(rows) == 1
+        _assert_report_command(rows[0])
+        assert "长度只能是 2 或 3" in rows[0][2]
+        assert "不要先写一句中文" in rows[0][2]
+    finally:
+        env["server"].shutdown()
+
+
+def test_four_rewrites_stay_a_count_failure(tmp_path, monkeypatch):
+    """A count outside 2 or 3 is still a json-count failure and is not stored."""
+
+    env = _ready(tmp_path, monkeypatch)
+    four = _three_rewrites(DRAFT) + [_three_rewrites(DRAFT)[0]]
+    text = json.dumps({"rewrites": four}, ensure_ascii=False)
+    log_path = _arm_report_stdout(env, tmp_path, monkeypatch, text, text)
+    try:
+        assert rewrite_problems(json.loads(text), {"draft": DRAFT}) == ["rewrite_count"]
+        client = _app().test_client()
+        run_id = _create(client, key="report-four", agent_count=2, round_count=1)
+        seed_persona_cache(run_id, seed=12)
+        slots = build_slots(2, seed=12)
+        summary = execute_loop(
+            run_id,
+            seed=12,
+            clock=Clock(),
+            candidates={slot["agent_id"]: "none" for slot in slots},
+        )
+        document = client.get(f"/api/tweet/runs/{run_id}/report").json["report"]
+        assert document["rewrites"] == []
+        assert document["status"] == "degraded"
+        assert "没有编造改写或证据" in "".join(document["degradation_reasons"])
+        assert summary["report_call"]["problems"] == ["rewrite_count"]
+        assert _sent(run_id, "report") == 2
+        rows = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+        assert len(rows) == 2
+        for row in rows:
+            _assert_report_command(row)
+        assert "长度只能是 2 或 3" in rows[1][2]
+    finally:
+        env["server"].shutdown()
+
+
+def test_wrapped_three_rewrites_are_kept(tmp_path, monkeypatch):
+    """Three rewrites inside an envelope are the same object. The count rule stays 2 or 3."""
+
+    env = _ready(tmp_path, monkeypatch)
+    inner = {"rewrites": _three_rewrites(DRAFT)}
+    wrapped = json.dumps({"text": json.dumps(inner, ensure_ascii=False), "stopReason": "end_turn"}, ensure_ascii=False)
+    assert parse_report_model(wrapped)["rewrites"] == inner["rewrites"]
+    assert rewrite_problems(parse_report_model(wrapped), {"draft": DRAFT}) == []
+    log_path = _arm_report_stdout(env, tmp_path, monkeypatch, wrapped, wrapped)
+    try:
+        client = _app().test_client()
+        run_id = _create(client, key="report-wrapped-three", agent_count=2, round_count=1)
+        seed_persona_cache(run_id, seed=13)
+        slots = build_slots(2, seed=13)
+        summary = execute_loop(
+            run_id,
+            seed=13,
+            clock=Clock(),
+            candidates={slot["agent_id"]: "none" for slot in slots},
+        )
+        assert summary["status"] == "complete"
+        document = client.get(f"/api/tweet/runs/{run_id}/report").json["report"]
+        assert len(document["rewrites"]) == 3
+        assert check_report(document, VALIDATORS) == []
+        assert _sent(run_id, "report") == 1
+        rows = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+        _assert_report_command(rows[0])
     finally:
         env["server"].shutdown()
