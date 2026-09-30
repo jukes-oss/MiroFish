@@ -16,10 +16,17 @@ from contracts.check_contracts import check_report, load_schemas
 
 from app.tweet.audience import build_slots
 from app.tweet.db import connect
-from app.tweet.loop import execute_loop
-from app.tweet.report import order_top_replies, semantic_problems
+from app.tweet.loop import execute_loop, persona_cli_schema
+from app.tweet.model_json import parse_model_object
+from app.tweet.report import (
+    order_top_replies,
+    report_cli_extra_args,
+    report_object_schema,
+    rewrite_problems,
+    semantic_problems,
+)
 from app.tweet.worker import WORKER_ID, advance_once, drain, refresh_lease
-from test_m3_tweet_loop import Clock, _app, _create, _ready, _sent, seed_persona_cache
+from test_m3_tweet_loop import DRAFT, Clock, _app, _create, _ready, _sent, seed_persona_cache
 
 BACKEND = Path(__file__).resolve().parents[1]
 _, VALIDATORS = load_schemas()
@@ -334,3 +341,111 @@ def test_eval_contract_layer_covers_both_profiles_and_leaves_n5_unverified():
         assert "待验" in completed.stdout
         assert "未调用模型" in completed.stdout
         assert "预测效果" not in completed.stdout
+
+
+def _arm_report_stdout(env, tmp_path, monkeypatch, generation: str, repair: str):
+    """Stand-in logs argv and returns the report sentences. Persona stays cached."""
+
+    log_path = tmp_path / "report-argv.jsonl"
+    env["grok"].write_text(
+        "\n".join([
+            "#!/usr/bin/env python3",
+            "import json, os, sys",
+            "prompt = sys.argv[2] if len(sys.argv) > 2 else ''",
+            "with open(os.environ['ARGV_LOG'], 'a', encoding='utf-8') as handle:",
+            "    handle.write(json.dumps(sys.argv, ensure_ascii=False) + '\\n')",
+            "if 'MIROFISH_REPAIR' in prompt:",
+            "    sys.stdout.write(os.environ['FAKE_REPAIR'])",
+            "else:",
+            "    sys.stdout.write(os.environ['FAKE_GENERATION'])",
+            "",
+        ]),
+        encoding="utf-8",
+    )
+    env["grok"].chmod(0o755)
+    monkeypatch.setenv("ARGV_LOG", str(log_path))
+    monkeypatch.setenv("FAKE_GENERATION", generation)
+    monkeypatch.setenv("FAKE_REPAIR", repair)
+    return log_path
+
+
+def _assert_report_command(argv):
+    assert argv[1] == "-p"
+    assert '"task":"report_stats"' in argv[2]
+    assert argv[3:] == report_cli_extra_args()
+    raw_schema = argv[argv.index("--json-schema") + 1]
+    schema = json.loads(raw_schema)
+    assert schema == report_object_schema()
+    assert schema["type"] == "object"
+    assert schema["title"] == "report"
+    assert schema != persona_cli_schema()
+    assert "display_name" not in schema.get("properties", {})
+
+
+def test_chinese_sentence_does_not_become_a_report(tmp_path, monkeypatch):
+    """Exit 0 prose is started, stays a json failure, and is not stored as rewrites."""
+
+    env = _ready(tmp_path, monkeypatch)
+    generation = "先按草稿的码点把可改切片对齐，再只产出要求的 rewrites JSON。"
+    repair = "改写跨度按草稿的码点切片核对后再给出 JSON。"
+    log_path = _arm_report_stdout(env, tmp_path, monkeypatch, generation, repair)
+    try:
+        assert parse_model_object(generation) is None
+        assert rewrite_problems(None, {"draft": DRAFT}) == ["json"]
+        client = _app().test_client()
+        run_id = _create(client, key="report-prose", agent_count=2, round_count=1)
+        seed_persona_cache(run_id, seed=8)
+        slots = build_slots(2, seed=8)
+        summary = execute_loop(
+            run_id,
+            seed=8,
+            clock=Clock(),
+            candidates={slot["agent_id"]: "none" for slot in slots},
+        )
+        assert summary["waves"][0]["model_items"] == 0
+        assert summary["waves"][0]["errors"] == []
+        document = client.get(f"/api/tweet/runs/{run_id}/report").json["report"]
+        assert document["rewrites"] == []
+        assert document["status"] == "degraded"
+        assert _sent(run_id, "report") == 2
+        rows = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+        assert len(rows) == 2
+        assert all('"task":"report_stats"' in row[2] for row in rows)
+        assert "MIROFISH_REPAIR" in rows[1][2]
+        assert "不要先写一句中文" in rows[0][2]
+        assert "不要跑脚本数码点" in rows[0][2]
+        assert "码点切片" not in rows[0][2]
+        for row in rows:
+            _assert_report_command(row)
+    finally:
+        env["server"].shutdown()
+
+
+def test_valid_report_json_is_kept_from_the_started_process(tmp_path, monkeypatch):
+    """A schema-valid rewrites object from the started process is kept."""
+
+    env = _ready(tmp_path, monkeypatch)
+    text = json.dumps({"rewrites": _valid_rewrites(DRAFT)}, ensure_ascii=False)
+    log_path = _arm_report_stdout(env, tmp_path, monkeypatch, text, text)
+    try:
+        client = _app().test_client()
+        run_id = _create(client, key="report-json", agent_count=2, round_count=1)
+        seed_persona_cache(run_id, seed=9)
+        slots = build_slots(2, seed=9)
+        summary = execute_loop(
+            run_id,
+            seed=9,
+            clock=Clock(),
+            candidates={slot["agent_id"]: "none" for slot in slots},
+        )
+        assert summary["status"] == "complete"
+        document = client.get(f"/api/tweet/runs/{run_id}/report").json["report"]
+        assert check_report(document, VALIDATORS) == []
+        assert len(document["rewrites"]) == 2
+        assert _sent(run_id, "report") == 1
+        rows = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+        assert len(rows) == 1
+        _assert_report_command(rows[0])
+        assert "MIROFISH_REPAIR" not in rows[0][2]
+    finally:
+        env["server"].shutdown()

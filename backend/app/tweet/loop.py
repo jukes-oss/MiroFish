@@ -40,10 +40,11 @@ PUBLIC_KINDS = {"reply": "reply", "quote": "quote", "repost": "repost"}
 # asks for at most one third of that batch.
 FAILED_SINGLE_CALL_SLOTS = 12
 PERSONA_CALL_MAX_SLOTS = FAILED_SINGLE_CALL_SLOTS // 3
-# grok 1.0.44 `--help` documents these persona flags. `--json-schema` constrains
-# the reply to that schema and implies `--output-format json`. `--no-memory`
-# is accepted by this binary (`grok --no-memory -h` exits 0). The persona
-# process is started with them. The report call does not receive them.
+# grok 1.0.44 `--help` documents these flags. `--json-schema` constrains the
+# reply to that schema and implies `--output-format json`. `--no-memory` is
+# accepted by this binary (`grok --no-memory -h` exits 0). The persona process
+# is started with the persona array. The tweet report uses the same flags with
+# the report object. Wave calls do not receive them.
 _VALIDATORS = None
 
 
@@ -482,6 +483,8 @@ def interpret_actions(
     by_id = {item["agent_id"]: item for item in items}
     document = _parse_object(text)
     if document is None:
+        if not expected:
+            return {}, [{"agent_id": None, "codes": ["json"]}]
         return {}, [{"agent_id": agent_id, "codes": ["json"]} for agent_id in expected]
     results = _result_rows(document)
     version_ok = _version_ok(document, "results") or _version_ok(document, "actions")

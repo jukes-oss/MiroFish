@@ -52,6 +52,35 @@ def _parse_object(text: str | None) -> dict | None:
     return parse_model_object(text)
 
 
+def report_object_schema() -> dict:
+    """The report object already used to validate the stored document."""
+
+    from contracts.check_contracts import SCHEMA_DIR, SCHEMA_FILES
+
+    document = json.loads((SCHEMA_DIR / SCHEMA_FILES["report"]).read_text(encoding="utf-8"))
+    if not isinstance(document, dict) or document.get("type") != "object":
+        raise RuntimeError("报告 schema 不是对象。")
+    return document
+
+
+def report_cli_extra_args() -> list[str]:
+    """Flags after ``-p`` and the prompt for a tweet report generation or repair."""
+
+    schema = json.dumps(report_object_schema(), ensure_ascii=False, separators=(",", ":"))
+    return [
+        "--max-turns",
+        "1",
+        "--json-schema",
+        schema,
+        "--disallowed-tools",
+        "run_terminal_cmd,run_terminal_command",
+        "--no-subagents",
+        "--disable-web-search",
+        "--no-plan",
+        "--no-memory",
+    ]
+
+
 def _span_ok(draft: str, span) -> bool:
     if not isinstance(span, dict):
         return False
@@ -657,12 +686,13 @@ def _report_prompt(run, evidence: dict) -> dict:
         "host_risk_level": evidence["backlash_risk"]["level"],
         "reply_ids": [item["action_id"] for item in evidence["top_replies"]],
         "instruction": (
-            "只返回一个 JSON 对象，键只有 rewrites。不要输出 top_replies、trigger_lines、"
+            "整段回复就是一个 JSON 对象，不要先写一句中文。不要跑脚本数码点。"
+            "键只有 rewrites。不要输出 top_replies、trigger_lines、"
             "disagreement、backlash_risk、evidence_ids，也不要输出第二个 JSON。"
             "rewrites 为 2 到 3 条，variant 取 preserve_claim、add_boundaries、change_style 中互不相同的值。"
             "每条含 variant、text、what_changed、changed_spans、expected_effect。"
             "text 必须和草稿不同，且不得包含“这是预测”。"
-            "changed_spans 的 start、end、text 是草稿的 Unicode 码点切片，text 必须等于该切片。"
+            "changed_spans 的 start、end、text 写在这个 JSON 里，text 等于草稿里从 start 到 end 的原文。"
             "expected_effect 含 hypothesis 和 tradeoff，simulation_verified 必须是 false。"
             f"未校准说明写成{MEMO_LABEL}。不要计算用量，不要编造证据编号。"
         ),
@@ -700,6 +730,7 @@ def finalize_report(
         if on_step is not None:
             on_step()
         prompt = _dump(_report_prompt(run, evidence))
+        report_args = report_cli_extra_args()
         first = generate(
             run_id,
             role="report",
@@ -707,6 +738,7 @@ def finalize_report(
             messages=[{"role": "user", "content": prompt}],
             kind="generation",
             clock=clock,
+            cli_extra_args=report_args,
         )
         sent = bool(first.sent)
         error = None if first.sent else first.error_code
@@ -726,11 +758,15 @@ def finalize_report(
                             "task": "repair",
                             "marker": REPAIR_MARKER,
                             "errors": problems,
-                            "rule": "不要编造证据编号，不要把引用写成回复，改写跨度必须等于草稿的码点切片。",
+                            "rule": (
+                                "整段回复就是要求的 JSON，不要先写一句中文。"
+                                "不要跑脚本数码点。不要编造证据编号，不要把引用写成回复。"
+                            ),
                         })},
                     ],
                     kind="repair",
                     clock=clock,
+                    cli_extra_args=report_args,
                 )
                 sent = sent or bool(second.sent)
                 if second.sent and second.status == "completed":

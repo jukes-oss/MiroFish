@@ -38,6 +38,7 @@ from app.tweet.loop import (
     persona_groups,
     persona_repair_fits,
 )
+from app.tweet.report import report_cli_extra_args, report_object_schema
 from app.tweet.model_json import parse_model_object
 from test_m3_tweet_loop import REPLY_TEXT, Clock, _actions, _app, _create, _ready, _sent
 
@@ -535,8 +536,15 @@ def _assert_one_persona_start(log_path, count_path, run_id: str):
     assert count_path.read_text(encoding="utf-8") == "1"
     _assert_started_persona_command(persona[0])
     assert report
-    assert all(row[1] == "-p" and len(row) == 3 for row in report)
-    assert all("--json-schema" not in row and "--disallowed-tools" not in row for row in report)
+    for row in report:
+        assert row[1] == "-p"
+        assert row[3:] == report_cli_extra_args()
+        raw_schema = row[row.index("--json-schema") + 1]
+        schema = json.loads(raw_schema)
+        assert schema == report_object_schema()
+        assert schema["type"] == "object"
+        assert schema["title"] == "report"
+        assert schema != persona_cli_schema()
     with connect() as conn:
         repairs = conn.execute(
             """

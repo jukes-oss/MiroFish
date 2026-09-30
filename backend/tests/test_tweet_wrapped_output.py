@@ -283,6 +283,10 @@ def test_prompts_name_the_output_contract():
     assert "top_replies" in report["instruction"]
     assert "这是预测" in report["instruction"]
     assert "模拟备忘" in report["instruction"]
+    assert "整段回复就是一个 JSON 对象，不要先写一句中文。" in report["instruction"]
+    assert "不要跑脚本数码点" in report["instruction"]
+    assert "码点切片" not in report["instruction"]
+    assert "先按" not in report["instruction"]
 
 
 def test_ollama_reads_parts_and_empty_content_reasoning():

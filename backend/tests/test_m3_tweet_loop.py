@@ -454,6 +454,16 @@ def test_persona_payload_omits_the_draft_and_silence_is_not_a_model_item():
     assert locked == {}
     assert errors[0]["codes"] == ["missing_id"]
     assert "none" not in json.dumps(errors)
+    prose = "先按草稿的码点把可改切片对齐，再只产出要求的 rewrites JSON。"
+    locked, errors = interpret_actions(prose, round_number=1, items=[], draft=DRAFT)
+    assert locked == {}
+    assert errors == [{"agent_id": None, "codes": ["json"]}]
+    assert prose not in json.dumps(errors, ensure_ascii=False)
+    locked, errors = interpret_actions(missing_text, round_number=1, items=[], draft=DRAFT)
+    assert locked == {}
+    assert errors == []
+    locked, errors = interpret_actions(prose, round_number=1, items=items, draft=DRAFT)
+    assert errors == [{"agent_id": "a001", "codes": ["json"]}]
 
 
 def test_default_120_by_3_cold_cache_is_five_calls(tmp_path, monkeypatch):
