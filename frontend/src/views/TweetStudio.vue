@@ -50,7 +50,7 @@
             <dt>波次</dt>
             <dd>{{ estimate.rounds }}</dd>
             <dt>预计调用</dt>
-            <dd>{{ estimate.expectedCalls }} 次，含 {{ estimate.personaCalls }} 次人设、{{ estimate.rounds }} 次波次和 1 次报告。修复另计，上限 {{ estimate.callLimit }} 次。</dd>
+            <dd>人设这次不启动，波次也不会开始。报告 1 次。上限 {{ estimate.callLimit }} 次。</dd>
             <dt>墙钟上限</dt>
             <dd>{{ estimate.wallLimitSeconds }} 秒</dd>
             <dt>通道</dt>

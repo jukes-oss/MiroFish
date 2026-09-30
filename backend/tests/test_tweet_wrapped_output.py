@@ -26,7 +26,7 @@ from app.tweet.loop import (
 )
 from app.tweet.model_json import parse_model_object
 from app.tweet.report import _clean_rewrites, _report_prompt, rewrite_problems, semantic_problems
-from test_m3_tweet_loop import REPLY_TEXT, Clock, _actions, _app, _create, _ready
+from test_m3_tweet_loop import REPLY_TEXT, Clock, _actions, _app, _create, _ready, seed_persona_cache
 from test_m4_report import _evidence, _valid_rewrites
 
 _, VALIDATORS = load_schemas()
@@ -330,10 +330,12 @@ def test_wrapped_mixed_run_keeps_persona_reply_and_schema_report(tmp_path, monke
             draft=DRAFT,
             author_context=AUTHOR,
         )
+        seed_persona_cache(run_id, seed=4)
         slots = build_slots(2, seed=4)
         candidates = {slot["agent_id"]: "none" for slot in slots}
         candidates["a001"] = "reply"
         summary = execute_loop(run_id, seed=4, clock=Clock(), candidates=candidates)
+        assert summary["persona"]["cache"] == "hit"
         assert summary["persona"]["fallback"] is False
         assert summary["status"] == "complete"
         actions = {row["agent_id"]: row for row in _actions(run_id)}
@@ -353,10 +355,6 @@ def test_wrapped_mixed_run_keeps_persona_reply_and_schema_report(tmp_path, monke
         assert "短句模板" not in blob
         assert "没有编造" not in blob
         with connect() as conn:
-            persona = conn.execute(
-                "SELECT body_json FROM artifacts WHERE run_id = ? AND kind = 'persona_batch'",
-                (run_id,),
-            ).fetchone()
             calls = conn.execute(
                 """
                 SELECT role, channel FROM provider_requests
@@ -365,25 +363,22 @@ def test_wrapped_mixed_run_keeps_persona_reply_and_schema_report(tmp_path, monke
                 """,
                 (run_id,),
             ).fetchall()
-        stored = json.loads(persona["body_json"])
-        assert stored["fallback_ids"] == []
-        assert all(item["display_name"].startswith("虚构") for item in stored["personas"])
         assert sorted((row["role"], row["channel"]) for row in calls) == [
             ("agent", "ollama"),
-            ("persona", "grok_cli"),
             ("report", "grok_cli"),
         ]
-        assert any("虚构" in prompt for prompt in env["brain"].prompts)
+        assert not any('"task":"persona_batch"' in prompt for prompt in env["brain"].prompts)
     finally:
         env["server"].shutdown()
 
 
 def test_unusable_wave_text_is_missing_not_silence(tmp_path, monkeypatch):
     env = _ready(tmp_path, monkeypatch)
-    env["brain"].script = ["valid", "not-json", "not-json", "valid"]
+    env["brain"].script = ["not-json", "not-json", "valid"]
     try:
         client = _app().test_client()
         run_id = _create(client, key="prose-wave", agent_count=2, round_count=1, draft=DRAFT)
+        seed_persona_cache(run_id, seed=4)
         slots = build_slots(2, seed=4)
         candidates = {slot["agent_id"]: "none" for slot in slots}
         candidates["a001"] = "reply"

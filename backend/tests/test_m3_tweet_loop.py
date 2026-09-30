@@ -364,6 +364,29 @@ def _sent(run_id: str, role: str | None = None) -> int:
     return int(row["n"])
 
 
+def seed_persona_cache(run_id: str, seed: int) -> None:
+    """Store personas without starting the persona CLI.
+
+    The tweet persona call is refused until the tool set is actually empty.
+    Wave and report tests still need personas, and the cache is the supported
+    way to reuse them without a new process.
+    """
+
+    from app.tweet.loop import _cache_put, persona_cache_key
+
+    with connect() as conn:
+        run = conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+    slots = build_slots(int(run["agent_count"]), seed)
+    profile = json.loads(run["capability_json"])
+    payload = build_persona_payload(slots, audience_version=run["audience_version"], seed=seed)
+    personas = []
+    for slot in slots:
+        item = _persona(slot)
+        item["persona_source"] = "subscription_cli"
+        personas.append(item)
+    _cache_put(persona_cache_key(profile, payload), personas)
+
+
 def _actions(run_id: str) -> list[dict]:
     with connect() as conn:
         rows = conn.execute(
@@ -443,13 +466,14 @@ def test_default_120_by_3_cold_cache_is_five_calls(tmp_path, monkeypatch):
     try:
         client = _app().test_client()
         run_id = _create(client)
+        seed_persona_cache(run_id, seed=7)
         summary = execute_loop(run_id, seed=7, clock=Clock())
         assert summary["status"] == "complete"
         assert summary["wave_sizes"] == [40, 40, 40]
-        assert summary["persona"]["cache"] == "miss"
+        assert summary["persona"]["cache"] == "hit"
         assert summary["persona"]["fallback"] is False
-        assert _sent(run_id) == 5
-        assert _sent(run_id, "persona") == 1
+        assert _sent(run_id) == 4
+        assert _sent(run_id, "persona") == 0
         assert _sent(run_id, "agent") == 3
         assert _sent(run_id, "report") == 1
         with connect() as conn:
@@ -465,19 +489,14 @@ def test_default_120_by_3_cold_cache_is_five_calls(tmp_path, monkeypatch):
                 """,
                 (run_id,),
             ).fetchall()
-            prompts = conn.execute(
-                "SELECT body_json FROM artifacts WHERE run_id = ? AND kind = 'persona_prompt'",
-                (run_id,),
-            ).fetchone()
             waves = conn.execute(
                 "SELECT body_json FROM artifacts WHERE run_id = ? AND kind = 'wave_input' ORDER BY created_at",
                 (run_id,),
             ).fetchall()
         assert exposures == 120
         assert [row["logical_batch"] for row in batches] == ["wave-1", "wave-2", "wave-3"]
-        assert DRAFT not in prompts["body_json"]
         assert env["brain"].ollama_calls == 3
-        assert env["brain"].brain_calls == 2
+        assert env["brain"].brain_calls == 1
         seen_items = []
         none_ids = {
             agent_id
@@ -508,7 +527,7 @@ def test_default_120_by_3_cold_cache_is_five_calls(tmp_path, monkeypatch):
         assert "模拟备忘" in document["confidence"]["basis"]
         assert 2 <= len(document["rewrites"]) <= 3
         persona_prompts = [prompt for prompt in env["brain"].prompts if '"task":"persona_batch"' in prompt]
-        assert persona_prompts and all(DRAFT not in prompt for prompt in persona_prompts)
+        assert persona_prompts == []
     finally:
         env["server"].shutdown()
 
@@ -520,8 +539,11 @@ def test_warm_cache_skips_the_persona_call(tmp_path, monkeypatch):
         first = _create(client, key="cold", draft=DRAFT)
         second = _create(client, key="warm", draft=DRAFT + "另一条")
         cold = execute_loop(first, seed=7, clock=Clock())
+        seed_persona_cache(second, seed=7)
         warm = execute_loop(second, seed=7, clock=Clock())
         assert cold["persona"]["cache"] == "miss"
+        assert cold["persona"]["stopped"] is True
+        assert _sent(first, "persona") == 0
         assert warm["persona"]["cache"] == "hit"
         assert warm["persona"]["calls"] == 0
         assert _sent(second) == 4
@@ -543,12 +565,13 @@ def test_empty_candidate_wave_sends_one_empty_batch_and_no_silent_requests(tmp_p
     try:
         client = _app().test_client()
         run_id = _create(client, key="empty", agent_count=6, round_count=2)
+        seed_persona_cache(run_id, seed=2)
         slots = build_slots(6, seed=2)
         candidates = {slot["agent_id"]: "none" for slot in slots}
         summary = execute_loop(run_id, seed=2, clock=Clock(), candidates=candidates)
         assert [wave["model_items"] for wave in summary["waves"]] == [0, 0]
         assert _sent(run_id, "agent") == 2
-        assert _sent(run_id, "persona") == 2
+        assert _sent(run_id, "persona") == 0
         assert _sent(run_id, "report") == 1
         actions = _actions(run_id)
         assert len(actions) == 6
@@ -570,10 +593,11 @@ def test_empty_candidate_wave_sends_one_empty_batch_and_no_silent_requests(tmp_p
 
 def test_four_account_mock_covers_reply_quote_scroll_and_missing(tmp_path, monkeypatch):
     env = _ready(tmp_path, monkeypatch)
-    env["brain"].script = ["valid", "omit:a004", "omit:a004", "valid"]
+    env["brain"].script = ["omit:a004", "omit:a004", "valid"]
     try:
         client = _app().test_client()
         run_id = _create(client, key="four", agent_count=4, round_count=1)
+        seed_persona_cache(run_id, seed=1)
         slots = build_slots(4, seed=1)
         candidates = {
             "a001": "reply",
@@ -597,10 +621,11 @@ def test_four_account_mock_covers_reply_quote_scroll_and_missing(tmp_path, monke
 
 def test_rejects_invisible_self_like_duplicate_and_keeps_locked_repairs(tmp_path, monkeypatch):
     env = _ready(tmp_path, monkeypatch)
-    env["brain"].script = ["valid", "illegal-mix", "illegal-mix", "valid"]
+    env["brain"].script = ["illegal-mix", "illegal-mix", "valid"]
     try:
         client = _app().test_client()
         illegal = _create(client, key="illegal", agent_count=3, round_count=1)
+        seed_persona_cache(illegal, seed=1)
         execute_loop(
             illegal,
             seed=1,
@@ -616,8 +641,9 @@ def test_rejects_invisible_self_like_duplicate_and_keeps_locked_repairs(tmp_path
         assert by_id["a003"]["action"] is None
         assert all(row["action"] is None for row in by_id.values())
 
-        env["brain"].script = ["valid", "duplicate", "duplicate", "valid"]
+        env["brain"].script = ["duplicate", "duplicate", "valid"]
         duplicated = _create(client, key="duplicate", agent_count=2, round_count=1)
+        seed_persona_cache(duplicated, seed=1)
         execute_loop(
             duplicated,
             seed=1,
@@ -629,8 +655,9 @@ def test_rejects_invisible_self_like_duplicate_and_keeps_locked_repairs(tmp_path
         assert all(row["action"] is None for row in dup_rows)
         assert any("duplicate_id" in row["payload_json"] for row in dup_rows)
 
-        env["brain"].script = ["valid", "lock-check", "lock-check", "valid"]
+        env["brain"].script = ["lock-check", "lock-check", "valid"]
         locked = _create(client, key="locked", agent_count=2, round_count=1)
+        seed_persona_cache(locked, seed=9)
         execute_loop(
             locked,
             seed=9,
@@ -649,10 +676,11 @@ def test_rejects_invisible_self_like_duplicate_and_keeps_locked_repairs(tmp_path
 
 def test_private_bleed_is_recorded_with_shared_context_risk(tmp_path, monkeypatch):
     env = _ready(tmp_path, monkeypatch)
-    env["brain"].script = ["valid", "bleed", "valid"]
+    env["brain"].script = ["bleed", "valid"]
     try:
         client = _app().test_client()
         run_id = _create(client, key="bleed", agent_count=2, round_count=1)
+        seed_persona_cache(run_id, seed=1)
         summary = execute_loop(
             run_id,
             seed=1,
@@ -683,6 +711,7 @@ def test_public_timeline_contains_only_earlier_waves(tmp_path, monkeypatch):
     try:
         client = _app().test_client()
         run_id = _create(client, key="timeline", agent_count=4, round_count=2)
+        seed_persona_cache(run_id, seed=1)
         execute_loop(
             run_id,
             seed=1,
@@ -734,6 +763,9 @@ def test_time_and_call_truncation_do_not_invent_exposures(tmp_path, monkeypatch)
         client = _app().test_client()
         clock = Clock()
         timed = _create(client, key="timed")
+        seed_persona_cache(timed, seed=7)
+        from app.providers.gateway import prepare_run
+        prepare_run(timed, clock=clock)
 
         def jump():
             with connect() as conn:
@@ -746,7 +778,7 @@ def test_time_and_call_truncation_do_not_invent_exposures(tmp_path, monkeypatch)
         summary = execute_loop(timed, seed=7, clock=clock, after_persona=jump)
         assert summary["waves"] == []
         assert [item["round"] for item in summary["waves_skipped"]] == [1, 2, 3]
-        assert _sent(timed, "persona") == 1
+        assert _sent(timed, "persona") == 0
         assert _sent(timed, "agent") == 0
         assert _sent(timed, "report") == 1
         with connect() as conn:
@@ -758,8 +790,9 @@ def test_time_and_call_truncation_do_not_invent_exposures(tmp_path, monkeypatch)
         assert env["brain"].ollama_calls == 0
 
         capped = _create(client, key="capped")
+        seed_persona_cache(capped, seed=8)
         with connect() as conn:
-            for index in range(7):
+            for index in range(8):
                 conn.execute(
                     """
                     INSERT INTO provider_requests (
@@ -772,8 +805,8 @@ def test_time_and_call_truncation_do_not_invent_exposures(tmp_path, monkeypatch)
         capped_summary = execute_loop(capped, seed=8, clock=Clock())
         assert capped_summary["waves"] == []
         assert capped_summary["waves_skipped"]
-        assert _sent(capped, "persona") == 1
-        assert _sent(capped, "agent") == 7
+        assert _sent(capped, "persona") == 0
+        assert _sent(capped, "agent") == 8
         with connect() as conn:
             wave_sent = conn.execute(
                 """
@@ -800,6 +833,7 @@ def test_subscription_only_uses_the_same_loop_on_the_chosen_cli(tmp_path, monkey
     try:
         client = _app().test_client()
         run_id = _create(client, key="sub-only", agent_count=3, round_count=1, execution_profile="subscription-only")
+        seed_persona_cache(run_id, seed=1)
         before = env["brain"].ollama_calls
         summary = execute_loop(
             run_id,
@@ -820,10 +854,10 @@ def test_subscription_only_uses_the_same_loop_on_the_chosen_cli(tmp_path, monkey
                     (run_id,),
                 )
             }
-        assert channels["persona"] == "codex_cli"
+        assert "persona" not in channels
         assert channels["agent"] == "codex_cli"
         assert channels["report"] == "codex_cli"
-        assert _sent(run_id) == 3
+        assert _sent(run_id) == 2
     finally:
         env["server"].shutdown()
 
@@ -840,17 +874,18 @@ def test_persona_repair_failure_uses_template_and_does_not_cache_it(tmp_path, mo
             clock=Clock(),
             candidates={"a001": "none", "a002": "none"},
         )
-        assert summary["persona"]["fallback"] is True
-        assert _sent(run_id, "persona") == 2
+        assert summary["persona"]["stopped"] is True
+        assert summary["persona"]["fallback"] is False
+        assert summary["persona"]["calls"] == 0
+        assert _sent(run_id, "persona") == 0
         with connect() as conn:
             cached = conn.execute("SELECT COUNT(*) AS n FROM persona_cache").fetchone()["n"]
-            stored = json.loads(conn.execute(
+            stored = conn.execute(
                 "SELECT body_json FROM artifacts WHERE run_id = ? AND kind = 'persona_batch'",
                 (run_id,),
-            ).fetchone()["body_json"])
+            ).fetchone()
         assert cached == 0
-        assert stored["fallback_ids"] == ["a001", "a002"]
-        assert all(item["persona_source"] == "persona_fallback" for item in stored["personas"])
-        assert all(item["display_name"].startswith("虚构") for item in stored["personas"])
+        assert stored is None
+        assert summary["waves_skipped"]
     finally:
         env["server"].shutdown()

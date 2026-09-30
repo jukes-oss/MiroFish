@@ -27,15 +27,20 @@ from app.tweet.audience import build_slots
 from app.tweet.db import connect
 from app.tweet.loop import (
     PERSONA_CALL_MAX_SLOTS,
+    PERSONA_NOT_STARTED,
+    PERSONA_TOOLSET_EMPTY,
     build_persona_payload,
     execute_loop,
     interpret_personas,
+    persona_array_schema,
     persona_call_seconds,
+    persona_cli_extra_args,
     persona_groups,
     persona_repair_fits,
+    refused_persona_argv,
 )
 from app.tweet.model_json import parse_model_object
-from test_m3_tweet_loop import FAKE_CLI, REPLY_TEXT, Clock, _actions, _app, _create, _ready, _sent
+from test_m3_tweet_loop import Clock, _actions, _app, _create, _ready, _sent
 
 import app.providers.gateway as gateway
 
@@ -88,26 +93,19 @@ def test_twelve_person_run_sends_three_short_persona_calls(tmp_path, monkeypatch
         candidates = {slot["agent_id"]: "none" for slot in slots}
         candidates["a001"] = "reply"
         summary = execute_loop(run_id, seed=4, clock=Clock(), candidates=candidates)
+        assert summary["persona"]["stopped"] is True
         assert summary["persona"]["fallback"] is False
-        assert summary["persona"]["calls"] == 3
-        assert summary["status"] == "complete"
-        assert _sent(run_id, "persona") == 3
-        actions = {row["agent_id"]: row for row in _actions(run_id)}
-        assert actions["a001"]["source"] == "model"
-        assert actions["a001"]["action"] == "reply"
-        assert REPLY_TEXT in actions["a001"]["payload_json"]
-        assert all(
-            actions[slot["agent_id"]]["source"] == "rule" and actions[slot["agent_id"]]["action"] == "none"
-            for slot in slots
-            if slot["agent_id"] != "a001"
-        )
+        assert summary["persona"]["calls"] == 0
+        assert summary["persona"]["error"] == PERSONA_NOT_STARTED
+        assert _sent(run_id, "persona") == 0
+        assert _actions(run_id) == []
         document = client.get(f"/api/tweet/runs/{run_id}/report").json["report"]
         assert check_report(document, VALIDATORS) == []
         assert document["schema_version"] == "2.0"
-        assert document["status"] == "complete"
+        assert document["status"] == "degraded"
         assert "模拟备忘" in document["limitations"][0]
-        assert len(document["rewrites"]) >= 2
-        assert document["degradation_reasons"] == []
+        assert "人设调用没有发出，后续波次没有开始。" in document["degradation_reasons"]
+        assert "人设使用了短句模板，不是订阅通道生成。" not in document["degradation_reasons"]
         with connect() as conn:
             prompts = conn.execute(
                 "SELECT body_json FROM artifacts WHERE run_id = ? AND kind = 'persona_prompt' ORDER BY created_at",
@@ -115,23 +113,14 @@ def test_twelve_person_run_sends_three_short_persona_calls(tmp_path, monkeypatch
             ).fetchall()
             calls = conn.execute(
                 """
-                SELECT role, channel, logical_batch FROM provider_requests
+                SELECT role, channel FROM provider_requests
                 WHERE run_id = ? AND status = 'completed'
                 """,
                 (run_id,),
             ).fetchall()
-        assert [len(json.loads(row["body_json"])["slots"]) for row in prompts] == [4, 4, 4]
-        by_role = {}
-        for row in calls:
-            by_role.setdefault(row["role"], set()).add(row["channel"])
-        assert by_role["persona"] == {"grok_cli"}
-        assert by_role["agent"] == {"ollama"}
-        assert by_role["report"] == {"grok_cli"}
-        assert sorted(row["logical_batch"] for row in calls if row["role"] == "persona") == [
-            "persona-1",
-            "persona-2",
-            "persona-3",
-        ]
+        assert [len(json.loads(row["body_json"])["slots"]) for row in prompts] == [4]
+        assert {row["role"] for row in calls} == {"report"}
+        assert {row["channel"] for row in calls} == {"grok_cli"}
     finally:
         env["server"].shutdown()
 
@@ -164,39 +153,32 @@ def test_persona_timeout_stays_a_degraded_template_memo(tmp_path, monkeypatch):
             candidates={slot["agent_id"]: "none" for slot in slots},
         )
         assert summary["status"] == "degraded"
-        assert summary["persona"]["fallback"] is True
-        assert summary["persona"]["calls"] == 3
-        assert _sent(run_id, "persona") == 3
+        assert summary["persona"]["stopped"] is True
+        assert summary["persona"]["fallback"] is False
+        assert summary["persona"]["calls"] == 0
+        assert _sent(run_id, "persona") == 0
         document = client.get(f"/api/tweet/runs/{run_id}/report").json["report"]
         assert check_report(document, VALIDATORS) == []
         assert document["status"] == "degraded"
-        assert "人设使用了短句模板，不是订阅通道生成。" in document["degradation_reasons"]
+        assert "人设调用没有发出，后续波次没有开始。" in document["degradation_reasons"]
+        assert "人设使用了短句模板，不是订阅通道生成。" not in document["degradation_reasons"]
         assert "模拟备忘" in document["limitations"][0]
-        actions = _actions(run_id)
-        assert len(actions) == 12
-        assert {row["source"] for row in actions} == {"rule"}
-        assert {row["action"] for row in actions} == {"none"}
+        assert _actions(run_id) == []
         with connect() as conn:
-            stored = json.loads(conn.execute(
+            stored = conn.execute(
                 "SELECT body_json FROM artifacts WHERE run_id = ? AND kind = 'persona_batch'",
                 (run_id,),
-            ).fetchone()["body_json"])
+            ).fetchone()
             rows = conn.execute(
                 """
-                SELECT status, exit_code, attempt_no, logical_batch
-                FROM provider_requests
+                SELECT status FROM provider_requests
                 WHERE run_id = ? AND role = 'persona'
-                ORDER BY logical_batch
                 """,
                 (run_id,),
             ).fetchall()
             cached = conn.execute("SELECT COUNT(*) AS n FROM persona_cache").fetchone()["n"]
-        assert stored["fallback_ids"] == [slot["agent_id"] for slot in slots]
-        assert all(item["persona_source"] == "persona_fallback" for item in stored["personas"])
-        assert [row["logical_batch"] for row in rows] == ["persona-1", "persona-2", "persona-3"]
-        assert {row["status"] for row in rows} == {"uncertain"}
-        assert {row["exit_code"] for row in rows} == {-9}
-        assert {row["attempt_no"] for row in rows} == {1}
+        assert stored is None
+        assert rows == []
         assert cached == 0
     finally:
         env["server"].shutdown()
@@ -290,33 +272,13 @@ def test_twelve_person_messy_cli_reply_skips_repair_and_keeps_personas(tmp_path,
         candidates = {slot["agent_id"]: "none" for slot in slots}
         candidates["a001"] = "reply"
         summary = execute_loop(run_id, seed=4, clock=Clock(), candidates=candidates)
+        assert summary["persona"]["stopped"] is True
         assert summary["persona"]["fallback"] is False
-        assert summary["persona"]["calls"] == 3
-        assert summary["status"] == "complete"
-        assert summary["waves_skipped"] == []
-        assert _sent(run_id, "persona") == 3
-        assert _sent(run_id, "agent") == 1
-        actions = {row["agent_id"]: row for row in _actions(run_id)}
-        assert len(actions) == 12
-        assert actions["a001"]["source"] == "model"
-        assert actions["a001"]["action"] == "reply"
-        assert all(
-            actions[slot["agent_id"]]["source"] == "rule" and actions[slot["agent_id"]]["action"] == "none"
-            for slot in slots
-            if slot["agent_id"] != "a001"
-        )
-        with connect() as conn:
-            rows = conn.execute(
-                """
-                SELECT attempt_no, logical_batch, status FROM provider_requests
-                WHERE run_id = ? AND role = 'persona'
-                ORDER BY logical_batch
-                """,
-                (run_id,),
-            ).fetchall()
-        assert [row["logical_batch"] for row in rows] == ["persona-1", "persona-2", "persona-3"]
-        assert {row["attempt_no"] for row in rows} == {1}
-        assert {row["status"] for row in rows} == {"completed"}
+        assert summary["persona"]["calls"] == 0
+        assert summary["waves_skipped"]
+        assert _sent(run_id, "persona") == 0
+        assert _sent(run_id, "agent") == 0
+        assert _actions(run_id) == []
     finally:
         env["server"].shutdown()
 
@@ -353,39 +315,33 @@ def test_persona_repair_timeout_does_not_drop_the_wave(tmp_path, monkeypatch):
             clock=clock,
             candidates={slot["agent_id"]: "none" for slot in slots},
         )
-        assert summary["waves_skipped"] == []
-        assert _sent(run_id, "persona") == 3
-        assert _sent(run_id, "agent") == 1
-        actions = _actions(run_id)
-        assert len(actions) == 12
-        assert {row["source"] for row in actions} == {"rule"}
-        assert {row["action"] for row in actions} == {"none"}
+        assert summary["waves_skipped"]
+        assert _sent(run_id, "persona") == 0
+        assert _sent(run_id, "agent") == 0
+        assert _actions(run_id) == []
         document = client.get(f"/api/tweet/runs/{run_id}/report").json["report"]
         assert check_report(document, VALIDATORS) == []
         assert document["status"] == "degraded"
-        assert "人设使用了短句模板，不是订阅通道生成。" in document["degradation_reasons"]
-        assert "有波次没有开始，没有补写曝光。" not in document["degradation_reasons"]
+        assert "人设调用没有发出，后续波次没有开始。" in document["degradation_reasons"]
+        assert "人设使用了短句模板，不是订阅通道生成。" not in document["degradation_reasons"]
+        assert "有波次没有开始，没有补写曝光。" in document["degradation_reasons"]
         assert "模拟备忘" in document["limitations"][0]
         with connect() as conn:
             rows = conn.execute(
                 """
-                SELECT status, attempt_no, logical_batch, attempt_kind
-                FROM provider_requests
+                SELECT attempt_kind FROM provider_requests
                 WHERE run_id = ? AND role = 'persona'
-                ORDER BY logical_batch
                 """,
                 (run_id,),
             ).fetchall()
-            stored = json.loads(conn.execute(
+            stored = conn.execute(
                 "SELECT body_json FROM artifacts WHERE run_id = ? AND kind = 'persona_batch'",
                 (run_id,),
-            ).fetchone()["body_json"])
-        assert [row["logical_batch"] for row in rows] == ["persona-1", "persona-2", "persona-3"]
-        assert {row["attempt_no"] for row in rows} == {1}
-        assert {row["attempt_kind"] for row in rows} == {"generation"}
-        assert {row["status"] for row in rows} == {"completed"}
-        assert stored["fallback_ids"] == [slot["agent_id"] for slot in slots]
-        assert all(item["persona_source"] == "persona_fallback" for item in stored["personas"])
+            ).fetchone()
+        assert rows == []
+        assert stored is None
+        window = RUN_MAX_WALL_SECONDS - REPORT_RESERVE_WALL_SECONDS - CLEANUP_RESERVE_SECONDS
+        assert persona_repair_fits(window, persona_calls_after=2, wave_count=1) is False
     finally:
         env["server"].shutdown()
 
@@ -405,85 +361,192 @@ def test_explanatory_prose_does_not_become_a_persona():
     contract = payload["output_contract"]["persona"]
     assert contract.startswith("60")
     assert "120" in contract
+    assert "不追求正好 60" in contract
     assert "写满即停" not in contract
-    assert "脚本" not in json.dumps(payload, ensure_ascii=False)
+    encoded = json.dumps(payload, ensure_ascii=False)
+    assert "输入已完整，只依据 slots，直接返回裸 JSON 数组。" in encoded
+    assert "不查文件、不跑脚本、不写准备说明。" in encoded
 
 
-def test_persona_call_argv_removes_the_terminal(tmp_path, monkeypatch):
-    """The stand-in records argv. This does not call Grok or Ollama."""
+PROSE_STDOUT = "我先核对字段，再用脚本数到正好 60。"
 
-    env = _ready(tmp_path, monkeypatch)
+
+def _valid_bare_personas(slots: list[dict]) -> str:
+    items = []
+    for slot in slots:
+        agent_id = slot["agent_id"]
+        persona = (
+            f"槽位{agent_id}只看公开标签。没有亲身经历时不跟着说话，也不把准备过程写进正文。"
+            "先读完可见句子再决定是否开口，没有句子就保持沉默。"
+        )
+        assert 60 <= len(persona) <= 120
+        items.append({
+            "agent_id": agent_id,
+            "display_name": f"虚构{agent_id}",
+            "bio": "公开标签",
+            "persona": persona,
+            "avoid_speaking_when": "没有具体句子时沉默。",
+        })
+    return json.dumps(items, ensure_ascii=False)
+
+
+def _arm_once(env, tmp_path, monkeypatch, text: str):
+    """Stand-in exits 0 with one fixed stdout. A second persona start fails."""
+
     log_path = tmp_path / "argv.jsonl"
+    count_path = tmp_path / "persona-starts.txt"
     env["grok"].write_text(
-        FAKE_CLI.replace(
-            'prompt = sys.argv[2] if len(sys.argv) > 2 else ""',
-            "\n".join([
-                'with open(os.environ["ARGV_LOG"], "a", encoding="utf-8") as handle:',
-                '    handle.write(json.dumps(sys.argv, ensure_ascii=False) + "\\n")',
-                'prompt = sys.argv[2] if len(sys.argv) > 2 else ""',
-            ]),
-            1,
-        ),
+        "\n".join([
+            "#!/usr/bin/env python3",
+            "import json, os, sys, urllib.request",
+            "prompt = sys.argv[2] if len(sys.argv) > 2 else ''",
+            "with open(os.environ['ARGV_LOG'], 'a', encoding='utf-8') as handle:",
+            "    handle.write(json.dumps(sys.argv, ensure_ascii=False) + '\\n')",
+            "if '\"task\":\"persona_batch\"' in prompt:",
+            "    count_path = os.environ['PERSONA_STARTS']",
+            "    seen = 0",
+            "    if os.path.exists(count_path):",
+            "        seen = int(open(count_path, encoding='utf-8').read() or '0')",
+            "    if seen >= 1:",
+            "        raise SystemExit('persona generation already used')",
+            "    open(count_path, 'w', encoding='utf-8').write(str(seen + 1))",
+            "    sys.stdout.write(os.environ['FAKE_STDOUT'])",
+            "    raise SystemExit(0)",
+            "request = urllib.request.Request(",
+            "    os.environ['FAKE_BRAIN'],",
+            "    data=json.dumps({'prompt': prompt}).encode('utf-8'),",
+            "    headers={'Content-Type': 'application/json'},",
+            ")",
+            "with urllib.request.urlopen(request, timeout=30) as response:",
+            "    sys.stdout.buffer.write(response.read())",
+            "",
+        ]),
         encoding="utf-8",
     )
     monkeypatch.setenv("ARGV_LOG", str(log_path))
+    monkeypatch.setenv("PERSONA_STARTS", str(count_path))
+    monkeypatch.setenv("FAKE_STDOUT", text)
+    return log_path, count_path
+
+
+def _assert_persona_call_not_started(log_path, count_path, run_id: str):
+    """Parsing model text does not prove the process was allowed to start."""
+
+    assert PERSONA_TOOLSET_EMPTY is False
+    rows = []
+    if log_path.exists():
+        rows = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+    persona = [row for row in rows if len(row) > 2 and '"task":"persona_batch"' in row[2]]
+    report = [row for row in rows if len(row) > 2 and '"task":"report_stats"' in row[2]]
+    assert persona == []
+    assert not count_path.exists()
+    blocked = refused_persona_argv("grok", "prompt")
+    assert blocked[1:3] == ["-p", "prompt"]
+    assert blocked[3:] == persona_cli_extra_args()
+    assert "--disallowed-tools" not in blocked
+    assert "--deny" not in blocked
+    schema = json.loads(blocked[blocked.index("--json-schema") + 1])
+    assert schema == persona_array_schema()
+    assert schema["type"] == "array"
+    assert set(schema["items"]["properties"]) == {
+        "agent_id",
+        "display_name",
+        "bio",
+        "persona",
+        "avoid_speaking_when",
+    }
+    assert blocked[blocked.index("--tools") + 1] == ""
+    assert len(blocked) != 3
+    assert report
+    assert all(row[1] == "-p" and len(row) == 3 for row in report)
+    assert all("--json-schema" not in row and "--tools" not in row for row in report)
+    with connect() as conn:
+        repairs = conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM provider_requests
+            WHERE run_id = ? AND role = 'persona' AND attempt_kind = 'repair'
+            """,
+            (run_id,),
+        ).fetchone()["n"]
+        generations = conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM provider_requests
+            WHERE run_id = ? AND role = 'persona'
+            """,
+            (run_id,),
+        ).fetchone()["n"]
+        stored = conn.execute(
+            "SELECT body_json FROM artifacts WHERE run_id = ? AND kind = 'persona_batch'",
+            (run_id,),
+        ).fetchone()
+    assert repairs == 0
+    assert generations == 0
+    assert stored is None
+
+
+def test_prose_stdout_does_not_start_and_stays_invalid(tmp_path, monkeypatch):
+    """Exit 0 prose is invalid. The process is not started, so repair stays 0."""
+
+    env = _ready(tmp_path, monkeypatch)
+    log_path, count_path = _arm_once(env, tmp_path, monkeypatch, PROSE_STDOUT)
     try:
         client = _app().test_client()
         run_id = _create(
             client,
-            key="persona-text-only",
-            agent_count=2,
+            key="prose-not-started",
+            agent_count=4,
             round_count=1,
             draft=DRAFT,
             author_context=AUTHOR,
         )
-        slots = build_slots(2, seed=4)
+        slots = build_slots(4, seed=4)
         summary = execute_loop(
             run_id,
             seed=4,
             clock=Clock(),
             candidates={slot["agent_id"]: "none" for slot in slots},
         )
+        locked, errors = interpret_personas(PROSE_STDOUT, slots)
+        assert locked == {}
+        assert [item["codes"] for item in errors] == [["json"], ["json"], ["json"], ["json"]]
+        assert summary["persona"]["stopped"] is True
         assert summary["persona"]["fallback"] is False
-        assert summary["waves_skipped"] == []
-        rows = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
-        persona = [row for row in rows if '"task":"persona_batch"' in row[2]]
-        report = [row for row in rows if '"task":"report_stats"' in row[2]]
-        assert len(persona) == 1
-        assert len(report) == 1
-        argv = persona[0]
-        assert argv[1] == "-p"
-        assert '"task":"persona_batch"' in argv[2]
-        assert "写满即停" not in argv[2]
-        assert argv[3:] == [
-            "--max-turns",
-            "1",
-            "--no-subagents",
-            "--disable-web-search",
-            "--no-plan",
-            "--no-memory",
-            "--disallowed-tools",
-            ",".join([
-                "run_terminal_cmd",
-                "run_terminal_command",
-                "read_file",
-                "grep",
-                "list_dir",
-                "search_replace",
-                "write",
-                "web_search",
-                "web_fetch",
-                "todo_write",
-                "task",
-                "Agent",
-            ]),
-        ]
-        denied = set(argv[argv.index("--disallowed-tools") + 1].split(","))
-        assert {"run_terminal_cmd", "run_terminal_command", "read_file", "grep", "list_dir"} <= denied
-        assert "--tools" not in argv
-        assert "--deny" not in argv
-        assert "--always-approve" not in argv
-        assert report[0][1] == "-p"
-        assert len(report[0]) == 3
+        assert summary["persona"]["calls"] == 0
+        _assert_persona_call_not_started(log_path, count_path, run_id)
+    finally:
+        env["server"].shutdown()
+
+
+def test_valid_bare_array_is_not_started_when_tools_stay_unproven(tmp_path, monkeypatch):
+    """A schema-valid array would lock. It is not accepted from a process that did not start."""
+
+    env = _ready(tmp_path, monkeypatch)
+    slots = build_slots(4, seed=4)
+    text = _valid_bare_personas(slots)
+    log_path, count_path = _arm_once(env, tmp_path, monkeypatch, text)
+    try:
+        client = _app().test_client()
+        run_id = _create(
+            client,
+            key="array-not-started",
+            agent_count=4,
+            round_count=1,
+            draft=DRAFT,
+            author_context=AUTHOR,
+        )
+        summary = execute_loop(
+            run_id,
+            seed=4,
+            clock=Clock(),
+            candidates={slot["agent_id"]: "none" for slot in slots},
+        )
+        locked, errors = interpret_personas(text, slots)
+        assert errors == []
+        assert set(locked) == {slot["agent_id"] for slot in slots}
+        assert all(item["persona_source"] == "subscription_cli" for item in locked.values())
+        assert summary["persona"]["stopped"] is True
+        assert summary["persona"]["fallback"] is False
+        assert summary["persona"]["calls"] == 0
+        _assert_persona_call_not_started(log_path, count_path, run_id)
     finally:
         env["server"].shutdown()

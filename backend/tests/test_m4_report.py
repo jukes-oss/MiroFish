@@ -19,7 +19,7 @@ from app.tweet.db import connect
 from app.tweet.loop import execute_loop
 from app.tweet.report import order_top_replies, semantic_problems
 from app.tweet.worker import WORKER_ID, advance_once, drain, refresh_lease
-from test_m3_tweet_loop import Clock, _app, _create, _ready, _sent
+from test_m3_tweet_loop import Clock, _app, _create, _ready, _sent, seed_persona_cache
 
 BACKEND = Path(__file__).resolve().parents[1]
 _, VALIDATORS = load_schemas()
@@ -146,6 +146,7 @@ def test_worker_drain_returns_a_schema_valid_report(tmp_path, monkeypatch):
     try:
         client = _app().test_client()
         run_id = _create(client, key="worker-report", agent_count=4, round_count=1)
+        seed_persona_cache(run_id, seed=1)
         assert drain() == 1
         fetched = client.get(f"/api/tweet/runs/{run_id}")
         assert fetched.json["run"]["status"] in ("complete", "degraded")
@@ -169,6 +170,7 @@ def test_all_scroll_report_is_complete_with_empty_top_replies(tmp_path, monkeypa
     try:
         client = _app().test_client()
         run_id = _create(client, key="scroll", agent_count=6, round_count=2)
+        seed_persona_cache(run_id, seed=2)
         slots = build_slots(6, seed=2)
         summary = execute_loop(
             run_id,
@@ -200,6 +202,7 @@ def test_quotes_are_not_listed_as_top_replies(tmp_path, monkeypatch):
     try:
         client = _app().test_client()
         run_id = _create(client, key="quotes", agent_count=4, round_count=2)
+        seed_persona_cache(run_id, seed=3)
         execute_loop(
             run_id,
             seed=3,
@@ -225,10 +228,11 @@ def test_quotes_are_not_listed_as_top_replies(tmp_path, monkeypatch):
 
 def test_failed_repair_is_legal_degraded_without_filler(tmp_path, monkeypatch):
     env = _ready(tmp_path, monkeypatch)
-    env["brain"].script = ["valid", "valid", "bad-report", "bad-report"]
+    env["brain"].script = ["valid", "bad-report", "bad-report"]
     try:
         client = _app().test_client()
         run_id = _create(client, key="bad-report", agent_count=2, round_count=1)
+        seed_persona_cache(run_id, seed=5)
         slots = build_slots(2, seed=5)
         summary = execute_loop(
             run_id,

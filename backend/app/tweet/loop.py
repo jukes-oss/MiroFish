@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 from contracts.check_contracts import exact_id_coverage, load_schemas, schema_errors
 
-from ..providers.gateway import _now_ms, generate
+from ..providers.gateway import _now_ms, _reject, generate
 from ..providers.limits import (
     CLEANUP_RESERVE_SECONDS,
     REPORT_RESERVE_CALLS,
@@ -39,32 +39,19 @@ PUBLIC_KINDS = {"reply": "reply", "quote": "quote", "repost": "repost"}
 # asks for at most one third of that batch.
 FAILED_SINGLE_CALL_SLOTS = 12
 PERSONA_CALL_MAX_SLOTS = FAILED_SINGLE_CALL_SLOTS // 3
-# Headless flags for the tweet persona call only. They remove tools and stop
-# after one turn. --deny would leave the shell available and cancel the turn.
-# --tools is an allowlist and is not used.
-PERSONA_TEXT_ONLY_ARGS = [
-    "--max-turns",
-    "1",
-    "--no-subagents",
-    "--disable-web-search",
-    "--no-plan",
-    "--no-memory",
-    "--disallowed-tools",
-    ",".join([
-        "run_terminal_cmd",
-        "run_terminal_command",
-        "read_file",
-        "grep",
-        "list_dir",
-        "search_replace",
-        "write",
-        "web_search",
-        "web_fetch",
-        "todo_write",
-        "task",
-        "Agent",
-    ]),
-]
+# grok 1.0.44 (5b807183dd79) was checked without sending a prompt to the model.
+# `grok --help` documents `--tools` as a comma-separated allowlist and
+# `--json-schema` as structured output (it implies `--output-format json`).
+# `grok -p … --tools '' --json-schema …` exits 1 with "Not signed in", not a
+# usage error, so the parser accepts an empty allowlist. The debug log stops
+# before `startup.agent_build.tool_registry`, so the resolved tool list was
+# not printed. The same binary's manual says the final toolset keeps the
+# requested tools plus always-on MCP meta-tools unless those meta-tools are
+# denied, and that an unmappable allowlist keeps the full grok toolset.
+# A denylist is not an empty set. The empty set was not observed, so the
+# tweet persona call is not started and is not sent as bare `grok -p`.
+PERSONA_TOOLSET_EMPTY = False
+PERSONA_NOT_STARTED = "persona_tools_not_empty"
 _VALIDATORS = None
 
 
@@ -120,6 +107,34 @@ def _cancelled(run_id: str) -> bool:
     return row is None or bool(row["cancel_requested"]) or row["status"] == "cancelled"
 
 
+def persona_array_schema() -> dict:
+    """The existing personas array. No new fields."""
+
+    from contracts.check_contracts import SCHEMA_DIR, SCHEMA_FILES
+
+    document = json.loads((SCHEMA_DIR / SCHEMA_FILES["persona_batch"]).read_text(encoding="utf-8"))
+    schema = document["properties"]["personas"]
+    if not isinstance(schema, dict) or schema.get("type") != "array":
+        raise RuntimeError("人设 schema 不是数组。")
+    return schema
+
+
+def persona_cli_extra_args() -> list[str]:
+    """Flags for a persona call whose tool set is actually empty.
+
+    Not passed to a process while ``PERSONA_TOOLSET_EMPTY`` is false.
+    """
+
+    schema = json.dumps(persona_array_schema(), ensure_ascii=False, separators=(",", ":"))
+    return ["--json-schema", schema, "--tools", ""]
+
+
+def refused_persona_argv(executable: str, prompt: str) -> list[str]:
+    """The persona argv this build does not execute."""
+
+    return [executable, "-p", prompt, *persona_cli_extra_args()]
+
+
 def fit_code_points(text: str, low: int, high: int) -> str:
     if len(text) < low:
         text = text + ("。" * (low - len(text)))
@@ -172,10 +187,14 @@ def build_persona_payload(slots: list[dict], *, audience_version: str, seed: int
         "slots": public,
         "output_contract": {
             "schema_version": "2.0",
-            "shape": "只返回一个 JSON 数组，每项一个人。不要 markdown，不要说明，字符串不要换行。",
+            "shape": (
+                "输入已完整，只依据 slots，直接返回裸 JSON 数组。"
+                "不要 markdown，不要说明，字符串不要换行。"
+                "不查文件、不跑脚本、不写准备说明。"
+            ),
             "display_name": "以虚构开头，不超过 12 个码点。",
             "bio": "不超过 16 个码点。",
-            "persona": "60 到 120 个码点。",
+            "persona": "60 到 120 个码点，不追求正好 60。",
             "avoid_speaking_when": "不超过 16 个码点。",
         },
     }
@@ -548,6 +567,12 @@ def _call_once(run_id, *, role, logical_batch, messages, kind, clock, on_step=No
     if on_step is not None:
         on_step()
     logger.info("tweet loop call role=%s batch=%s kind=%s", role, logical_batch, kind)
+    if role == "persona" and not PERSONA_TOOLSET_EMPTY:
+        # Generation and its repair both stop here. Report and wave calls do not.
+        return _reject(
+            PERSONA_NOT_STARTED,
+            "人设调用的工具集合不能确认为空，这次没有启动。",
+        )
     return generate(
         run_id,
         role=role,
@@ -555,7 +580,7 @@ def _call_once(run_id, *, role, logical_batch, messages, kind, clock, on_step=No
         messages=messages,
         kind=kind,
         clock=clock,
-        cli_extra_args=PERSONA_TEXT_ONLY_ARGS if role == "persona" else None,
+        cli_extra_args=persona_cli_extra_args() if role == "persona" else None,
     )
 
 
