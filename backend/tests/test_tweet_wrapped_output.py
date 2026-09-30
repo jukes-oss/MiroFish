@@ -241,7 +241,12 @@ def test_prompts_name_the_output_contract():
     slots = build_slots(2, seed=1)
     persona = build_persona_payload(slots, audience_version="zh_x_v1", seed=1)
     encoded = json.dumps(persona, ensure_ascii=False)
-    assert "虚构" in persona["output_contract"]["display_name"]
+    assert "必须以「虚构」开头" in persona["output_contract"]["display_name"]
+    assert "再加至少一个字" in persona["output_contract"]["display_name"]
+    assert "3 到 30 个码点" in persona["output_contract"]["display_name"]
+    assert "同一批里不要重名" in persona["output_contract"]["display_name"]
+    assert "虚构甲" in persona["output_contract"]["display_name"]
+    assert "不要只写「虚构」两个字" in persona["output_contract"]["display_name"]
     assert "60" in persona["output_contract"]["persona"]
     assert "120" in persona["output_contract"]["persona"]
     assert DRAFT not in encoded

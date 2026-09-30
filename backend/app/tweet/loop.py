@@ -149,7 +149,7 @@ def fallback_persona(slot: dict) -> dict:
     )
     return {
         "agent_id": agent_id,
-        "display_name": fit_code_points(f"虚构{agent_id}", 3, 30),
+        "display_name": f"虚构{agent_id}"[:30],
         "bio": "模板人设，非订阅生成",
         "persona": persona,
         "avoid_speaking_when": "没有具体句子时保持沉默。",
@@ -185,7 +185,11 @@ def build_persona_payload(slots: list[dict], *, audience_version: str, seed: int
                 "不要 markdown，不要说明，字符串不要换行。"
                 "不查文件、不跑脚本、不写准备说明。"
             ),
-            "display_name": "以虚构开头，不超过 12 个码点。",
+            "display_name": (
+                "display_name 必须以「虚构」开头，再加至少一个字，"
+                "整个名字 3 到 30 个码点，同一批里不要重名。"
+                "例如「虚构甲」。不要只写「虚构」两个字。"
+            ),
             "bio": "不超过 16 个码点。",
             "persona": "60 到 120 个码点，不追求正好 60。",
             "avoid_speaking_when": "不超过 16 个码点。",

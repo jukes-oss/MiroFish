@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from contracts.check_contracts import check_report, load_schemas
+from contracts.check_contracts import check_report, load_schemas, schema_errors
 
 from app.providers.adapters import AdapterOutcome
 from app.providers.gateway import invoke_subscription_cli
@@ -28,6 +28,7 @@ from app.tweet.db import connect
 from app.tweet.loop import (
     PERSONA_CALL_MAX_SLOTS,
     build_persona_payload,
+    _normalize_persona_item,
     execute_loop,
     interpret_personas,
     persona_array_schema,
@@ -402,10 +403,16 @@ def test_explanatory_prose_does_not_become_a_persona():
         assert [item["codes"] for item in errors] == [["json"], ["json"], ["json"], ["json"]]
     payload = build_persona_payload(build_slots(4, seed=1), audience_version="zh_x_v1", seed=1)
     contract = payload["output_contract"]["persona"]
+    name_rule = payload["output_contract"]["display_name"]
     assert contract.startswith("60")
     assert "120" in contract
     assert "不追求正好 60" in contract
     assert "写满即停" not in contract
+    assert name_rule == (
+        "display_name 必须以「虚构」开头，再加至少一个字，"
+        "整个名字 3 到 30 个码点，同一批里不要重名。"
+        "例如「虚构甲」。不要只写「虚构」两个字。"
+    )
     encoded = json.dumps(payload, ensure_ascii=False)
     assert "输入已完整，只依据 slots，直接返回裸 JSON 数组。" in encoded
     assert "不查文件、不跑脚本、不写准备说明。" in encoded
@@ -414,9 +421,9 @@ def test_explanatory_prose_does_not_become_a_persona():
 PROSE_STDOUT = "我先核对字段，再用脚本数到正好 60。"
 
 
-def _valid_bare_personas(slots: list[dict]) -> str:
+def _bare_personas(slots: list[dict], names: list[str]) -> str:
     items = []
-    for slot in slots:
+    for slot, name in zip(slots, names, strict=True):
         agent_id = slot["agent_id"]
         persona = (
             f"槽位{agent_id}只看公开标签。没有亲身经历时不跟着说话，也不把准备过程写进正文。"
@@ -425,12 +432,16 @@ def _valid_bare_personas(slots: list[dict]) -> str:
         assert 60 <= len(persona) <= 120
         items.append({
             "agent_id": agent_id,
-            "display_name": f"虚构{agent_id}",
+            "display_name": name,
             "bio": "公开标签",
             "persona": persona,
             "avoid_speaking_when": "没有具体句子时沉默。",
         })
     return json.dumps(items, ensure_ascii=False)
+
+
+def _valid_bare_personas(slots: list[dict]) -> str:
+    return _bare_personas(slots, [f"虚构{slot['agent_id']}" for slot in slots])
 
 
 def _arm_once(env, tmp_path, monkeypatch, text: str):
@@ -603,6 +614,115 @@ def test_valid_bare_array_starts_once_and_locks_four(tmp_path, monkeypatch):
         assert stored["fallback_ids"] == []
         assert [item["agent_id"] for item in stored["personas"]] == [slot["agent_id"] for slot in slots]
         assert all(item["persona_source"] == "subscription_cli" for item in stored["personas"])
+        _assert_one_persona_start(log_path, count_path, run_id)
+    finally:
+        env["server"].shutdown()
+
+
+def test_two_character_name_stays_schema_failure(tmp_path, monkeypatch):
+    """「虚构」 is two code points. Schema still fails. The name is not padded."""
+
+    env = _ready(tmp_path, monkeypatch)
+    slots = build_slots(4, seed=4)
+    text = _bare_personas(slots, ["虚构", "虚构", "虚构", "虚构"])
+    log_path, count_path = _arm_once(env, tmp_path, monkeypatch, text)
+    try:
+        name_rule = persona_array_schema()["items"]["properties"]["display_name"]
+        assert name_rule["minLength"] == 3
+        assert name_rule["pattern"] == "^虚构"
+        assert name_rule["maxLength"] == 30
+        _, validators = load_schemas()
+        detail = schema_errors(validators["persona_batch"], {
+            "schema_version": "2.0",
+            "personas": json.loads(text),
+        })
+        assert detail == [
+            "schema: personas/0/display_name: '虚构' is too short",
+            "schema: personas/1/display_name: '虚构' is too short",
+            "schema: personas/2/display_name: '虚构' is too short",
+            "schema: personas/3/display_name: '虚构' is too short",
+        ]
+        assert _normalize_persona_item(json.loads(text)[0])["display_name"] == "虚构"
+        client = _app().test_client()
+        run_id = _create(
+            client,
+            key="short-name",
+            agent_count=4,
+            round_count=1,
+            draft=DRAFT,
+            author_context=AUTHOR,
+        )
+        summary = execute_loop(
+            run_id,
+            seed=4,
+            clock=Clock(),
+            candidates={slot["agent_id"]: "none" for slot in slots},
+        )
+        locked, errors = interpret_personas(text, slots)
+        assert locked == {}
+        assert [item["codes"] for item in errors] == [["schema"], ["schema"], ["schema"], ["schema"]]
+        assert summary["persona"]["stopped"] is False
+        assert summary["persona"]["fallback"] is True
+        assert summary["persona"]["calls"] == 1
+        with connect() as conn:
+            stored = json.loads(conn.execute(
+                "SELECT body_json FROM artifacts WHERE run_id = ? AND kind = 'persona_batch'",
+                (run_id,),
+            ).fetchone()["body_json"])
+        assert [item["codes"] for item in stored["errors"]] == [["schema"], ["schema"], ["schema"], ["schema"]]
+        assert stored["fallback_ids"] == [slot["agent_id"] for slot in slots]
+        assert all(item["persona_source"] == "persona_fallback" for item in stored["personas"])
+        for slot, item in zip(slots, stored["personas"], strict=True):
+            assert item["display_name"] == f"虚构{slot['agent_id']}"
+            assert item["display_name"] != "虚构"
+            assert "短句模板" in item["persona"]
+        _assert_one_persona_start(log_path, count_path, run_id)
+        prompt = _logged_argv(log_path)[0][0][2]
+        assert "不要只写「虚构」两个字" in prompt
+    finally:
+        env["server"].shutdown()
+
+
+def test_three_character_names_lock_from_the_subscription(tmp_path, monkeypatch):
+    """Names like 虚构甲 are long enough, unique, and kept from the started process."""
+
+    env = _ready(tmp_path, monkeypatch)
+    slots = build_slots(4, seed=4)
+    names = ["虚构甲", "虚构乙", "虚构丙", "虚构丁"]
+    assert len(set(names)) == 4
+    assert all(name.startswith("虚构") and 3 <= len(name) <= 30 for name in names)
+    text = _bare_personas(slots, names)
+    log_path, count_path = _arm_once(env, tmp_path, monkeypatch, text)
+    try:
+        client = _app().test_client()
+        run_id = _create(
+            client,
+            key="legal-names",
+            agent_count=4,
+            round_count=1,
+            draft=DRAFT,
+            author_context=AUTHOR,
+        )
+        summary = execute_loop(
+            run_id,
+            seed=4,
+            clock=Clock(),
+            candidates={slot["agent_id"]: "none" for slot in slots},
+        )
+        assert summary["persona"]["stopped"] is False
+        assert summary["persona"]["fallback"] is False
+        assert summary["persona"]["calls"] == 1
+        with connect() as conn:
+            stored = json.loads(conn.execute(
+                "SELECT body_json FROM artifacts WHERE run_id = ? AND kind = 'persona_batch'",
+                (run_id,),
+            ).fetchone()["body_json"])
+        assert stored["errors"] == []
+        assert stored["fallback_ids"] == []
+        assert [item["agent_id"] for item in stored["personas"]] == [slot["agent_id"] for slot in slots]
+        assert [item["display_name"] for item in stored["personas"]] == names
+        assert all(item["persona_source"] == "subscription_cli" for item in stored["personas"])
+        assert all("短句模板" not in item["persona"] for item in stored["personas"])
         _assert_one_persona_start(log_path, count_path, run_id)
     finally:
         env["server"].shutdown()
